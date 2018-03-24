@@ -5,7 +5,7 @@ srcs = $(wildcard src/*.c)
 objs = $(srcs:.c=.o)
 
 proxy: $(objs)
-	$(CC) $(CFLAGS) $(LDFLAGS) $(LIBS) -o $@ $^
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LIBS)
 
 .PHONY: clean
 clean:
