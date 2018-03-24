@@ -1,4 +1,4 @@
-CFLAGS = -g -std=c11 -Wall -Werror -Isrc -I/usr/local/include
+CFLAGS = -g -std=c11 -Wall -Werror -Wextra -Isrc -I/usr/local/include
 LIBS = -lhttp_parser
 
 srcs = $(wildcard src/*.c)
