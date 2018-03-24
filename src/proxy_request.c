@@ -269,6 +269,6 @@ proxy_request(struct proxy *proxy)
 
         context_free(&ctx);
 
-        return nparsed == len;
+        return nparsed == (size_t)len;
     }
 }

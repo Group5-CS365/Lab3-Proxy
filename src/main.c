@@ -22,7 +22,7 @@ static void usage(char const * const progname, int status)
 
     printf("usage: %s [OPTIONS] PORT, where\n", progname);
     printf("  OPTIONS:\n");
-    for (int i = 0; i < sizeof (long_opts) / sizeof (struct option) - 1; ++i)
+    for (size_t i = 0; i < sizeof (long_opts) / sizeof (struct option) - 1; ++i)
         printf("\t-%c, --%s, %s\n",
                long_opts[i].val, long_opts[i].name, opts_desc[i]);
 
