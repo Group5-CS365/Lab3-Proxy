@@ -19,7 +19,8 @@ byte_string_resize(byte_string *bs, size_t capacity)
 byte_string
 byte_string_of_bytes(bytes b)
 {
-    byte_string bs = {};
+    byte_string bs;
+    byte_string_init(&bs);
     byte_string_append(&bs, b);
     return bs;
 }

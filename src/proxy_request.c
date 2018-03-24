@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <strings.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>
@@ -20,6 +20,14 @@
 #include "bytes.h"
 #include "byte_string.h"
 
+
+#ifndef http_parser_url_init
+#define http_parser_url_init(u) memset((u), 0, sizeof (struct http_parser_url))
+#endif
+
+#ifndef http_parser_settings_init
+#define http_parser_settings_init(s) memset((s), 0, sizeof (struct http_parser_settings))
+#endif
 
 enum state {
     s_init, s_url, s_header_field, s_header_value, s_body, s_error
@@ -40,11 +48,18 @@ struct context {
 };
 
 static void
+context_init(struct context *ctx)
+{
+    memset(ctx, 0, sizeof (struct context));
+}
+
+static void
 context_parse_url(struct context *ctx)
 {
-    struct http_parser_url url = {};
     bytes buf = bytes_of_byte_string(ctx->chunks);
+    struct http_parser_url url;
 
+    http_parser_url_init(&url);
     if (http_parser_parse_url(buf.iov_base, buf.iov_len, false, &url) != SUCCESS)
         fprintf(stderr, "error: parsing url failed\n");
 
@@ -92,16 +107,16 @@ static char const *
 name_of_url_field(enum http_parser_url_fields field)
 {
     switch (field) {
-#define $(x) case x: return #x
-        $(UF_SCHEMA);
-        $(UF_HOST);
-        $(UF_PORT);
-        $(UF_PATH);
-        $(UF_QUERY);
-        $(UF_FRAGMENT);
-        $(UF_USERINFO);
-        $(UF_MAX);
-#undef $
+#define XX(x) case x: return #x
+        XX(UF_SCHEMA);
+        XX(UF_HOST);
+        XX(UF_PORT);
+        XX(UF_PATH);
+        XX(UF_QUERY);
+        XX(UF_FRAGMENT);
+        XX(UF_USERINFO);
+        XX(UF_MAX);
+#undef XX
     default: return "(unknown)";
     }
 }
@@ -110,10 +125,12 @@ static void
 context_debug(struct context *ctx)
 {
     struct header *header;
-    byte_string msg = {};
+    byte_string msg;
     enum { BUFLEN = 8 };
     char buf[BUFLEN];
     int len;
+
+    byte_string_init(&msg);
 
     byte_string_append_string(&msg, "URL: ");
     byte_string_append(&msg, ctx->url);
@@ -137,7 +154,7 @@ context_debug(struct context *ctx)
         }
         else {
             bytes part;
-            part.iov_base = ctx->url.iov_base + ctx->url_fields.field_data[field].off;
+            part.iov_base = (uint8_t *)ctx->url.iov_base + ctx->url_fields.field_data[field].off;
             part.iov_len = ctx->url_fields.field_data[field].len;
             byte_string_append(&msg, part);
         }
@@ -236,17 +253,19 @@ proxy_request(struct proxy *proxy)
     ssize_t len;
     size_t nparsed;
     http_parser parser;
-    http_parser_settings settings = {};
-    struct context ctx = {};
+    http_parser_settings settings;
+    struct context ctx;
 
     http_parser_init(&parser, HTTP_REQUEST);
     parser.data = &ctx;
 
+    http_parser_settings_init(&settings);
     settings.on_url = on_url;
     settings.on_header_field = on_header_field;
     settings.on_header_value = on_header_value;
     settings.on_headers_complete = on_headers_complete;
 
+    context_init(&ctx);
     ctx.state = s_init;
 
     len = recv(proxy->sockfd, buf, RECV_BUFLEN, 0);
