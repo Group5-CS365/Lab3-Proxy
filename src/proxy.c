@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <arpa/inet.h>
@@ -36,7 +37,9 @@ static int
 proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
 {
     int fd;
-    struct sockaddr_in sa = {};
+    struct sockaddr_in sa;
+
+    memset(&sa, 0, sizeof sa);
 
     fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd == FAILURE) {
