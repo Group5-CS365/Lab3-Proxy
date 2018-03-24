@@ -1,5 +1,12 @@
 language: c
-before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y libhttp-parser-dev
+compiler: gcc
+
+sudo: false
+dist: trusty
+
+addons:
+  apt:
+    packages:
+      - libhttp-parser-dev
+
 script: make
