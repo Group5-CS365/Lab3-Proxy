@@ -193,7 +193,6 @@ proxy_select(struct proxy *proxy)
     if (FD_ISSET(proxy->sockfd, &fds))
         return proxy_accept(proxy);
 
-    puts("timeout");
     return SUCCESS; // timeout
 }
 
