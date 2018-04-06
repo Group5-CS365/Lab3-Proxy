@@ -1,5 +1,6 @@
 #include "proxy.h"
 
+#include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -170,6 +171,33 @@ proxy_accept(struct proxy *proxy)
 }
 
 /*
+ * Wait for a connection, with timeout.
+ */
+static int
+proxy_select(struct proxy *proxy)
+{
+    struct timeval tv;
+    fd_set fds;
+
+    tv.tv_sec = 5;
+    tv.tv_usec = 0;
+
+    FD_ZERO(&fds);
+    FD_SET(proxy->sockfd, &fds);
+
+    if (select(proxy->sockfd+1, &fds, NULL, NULL, &tv) == FAILURE) {
+        perror("proxy_select(): select() failed");
+        return FAILURE;
+    }
+
+    if (FD_ISSET(proxy->sockfd, &fds))
+        return proxy_accept(proxy);
+
+    puts("timeout");
+    return SUCCESS; // timeout
+}
+
+/*
  * Try to bury any dead children, but do not block waiting for them to die.
  */
 static void
@@ -190,7 +218,7 @@ run_proxy(uint16_t port, bool verbose)
     if (proxy_start(&proxy, port, verbose) == FAILURE)
         errx(EXIT_FAILURE, "fatal error");
 
-    while (proxy_accept(&proxy) == SUCCESS)
+    while (proxy_select(&proxy) == SUCCESS)
         ward_off_zombies();
 
     proxy_cleanup(&proxy);
