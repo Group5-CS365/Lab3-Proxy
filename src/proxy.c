@@ -47,11 +47,18 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
         return FAILURE;
     }
 
-    // TODO: set socket options (keepalive, ndelay, etc)?
-
     sa.sin_family = AF_INET;
     sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_port = htons(port);
+
+    const int option = 1;
+
+    //setsockopt to reuse address
+    if(setsockopt(fd, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option, sizeof(option)) < 0) {
+      printf("setsockopt failed\n");
+      close(fd);
+      exit(2);
+    }
 
     if (bind(fd, (struct sockaddr *)&sa, sizeof sa) == FAILURE) {
         perror("proxy_start(): failed to bind socket");
