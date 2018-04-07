@@ -1,2 +1,9 @@
 language: c
+compiler:
+  - clang
+  - gcc
+
+sudo: false
+dist: trusty
+
 script: make
