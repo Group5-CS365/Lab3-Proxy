@@ -1,3 +1,5 @@
+#include "proxy.h"
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -17,12 +19,12 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "proxy.h"
+#include "http.h"
 
 enum { SUCCESS = 0, FAILURE = -1 };
 
 #define LISTEN_BACKLOG 8 // FIXME: what is a good value for this?
-#define RECV_BUFLEN 2048 // FIXME: ^
+#define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
 
 struct proxy {
     int sockfd;
@@ -116,7 +118,7 @@ proxy_server_request() {
     hint.ai_flags = AI_PASSIVE;       // use my IP address
 
     const char* name = "http://www.google.com";
-    
+
     getaddrinfo(name, "8090", &hint, &aip);
     for (rp = aip; rp != NULL; rp = rp->ai_next) {
         cfd = socket(rp->ai_family,
@@ -158,13 +160,33 @@ proxy_server_request() {
 }
 
 /*
- * Process a client request.
- * Returns true to indicate proxy_request() should be called again,
+ * Handle a request from the client.
+ * Returns true to indicate proxy_recv_request() should be called again,
  * or false to indicate the connection has been closed.
  * Exits on error.
  */
 static bool
-proxy_request(struct proxy *proxy)
+proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
+{
+    struct http_request_line reqline = parse_http_request_line(buf, len);
+
+    debug_http_request_line(reqline);
+
+    // TODO: proxy HTTP traffic to the server specified in the Host header
+    // OPTIONAL: set socket options according to headers (keepalive, etc)?
+    proxy_server_request();
+
+    return reqline.valid;
+}
+
+/*
+ * Receive a request from the client.
+ * Returns true to indicate proxy_recv_request() should be called again,
+ * or false to indicate the connection has been closed.
+ * Exits on error.
+ */
+static bool
+proxy_recv_request(struct proxy *proxy)
 {
     char buf[RECV_BUFLEN];
     ssize_t len;
@@ -182,11 +204,7 @@ proxy_request(struct proxy *proxy)
                    ntohs(proxy->client.sin_port));
         return false;
     default:
-        proxy_server_request();
-        // TODO: set socket options according to headers (keepalive, etc)?
-        printf("%*s", (int)len, buf);
-
-        return true;
+        return proxy_handle_request(proxy, buf, len);
     }
 }
 
@@ -199,7 +217,7 @@ proxy_main(struct proxy *proxy)
                ntohs(proxy->client.sin_port));
 
 
-    while (proxy_request(proxy))
+    while (proxy_recv_request(proxy))
         ;
 
     close(proxy->sockfd);
