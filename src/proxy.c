@@ -1,5 +1,3 @@
-#include "proxy.h"
-
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -18,6 +16,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
+#include "proxy.h"
 
 enum { SUCCESS = 0, FAILURE = -1 };
 
@@ -54,10 +53,10 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
     const int option = 1;
 
     //setsockopt to reuse address
-    if(setsockopt(fd, SOL_SOCKET,(SO_REUSEPORT | SO_REUSEADDR),(char*)&option, sizeof(option)) < 0) {
-      printf("setsockopt failed\n");
+    if(setsockopt(fd, SOL_SOCKET,SO_REUSEADDR, (char*)&option, sizeof(option)) == FAILURE) {
+      perror("setsockopt(): failed to set socket to reuse address\n");
       close(fd);
-      exit(2);
+      return FAILURE;
     }
 
     if (bind(fd, (struct sockaddr *)&sa, sizeof sa) == FAILURE) {
