@@ -126,6 +126,7 @@ parse_http_header_field(char *buf, size_t len)
         return head;
     }
 
+    // Field name
     head.field_name.p = p;
     p = memchr(p, ':', len);
     head.field_name.len = p - head.field_name.p;
@@ -155,16 +156,17 @@ parse_http_header_field(char *buf, size_t len)
     len -= p - head.field_value.p;
 
     if (p == end) {
-        fputs("warning: invalid request line (after request target)\n", stderr);
+        fputs("warning: invalid header field (after field value)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
         return head;
     }
 
     if (*p != '\n') {
-        fputs("warning: invalid request line (after request target)\n", stderr);
+        fputs("warning: invalid header field (missing LF)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
+        fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
         return head;
     }
 
