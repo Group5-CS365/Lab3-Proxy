@@ -168,15 +168,30 @@ proxy_server_request() {
 static bool
 proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
 {
+    char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
 
     debug_http_request_line(reqline);
+
+    if (!reqline.valid)
+        return false;
+
+    len -= buf - reqline.end;
+    buf = reqline.end;
+
+    for (struct http_header_field field = parse_http_header_field(buf, len);
+         buf != end && field.valid;
+         field = parse_http_header_field(buf, len)) {
+        debug_http_header_field(field);
+        len -= buf - field.end;
+        buf = field.end;
+    }
 
     // TODO: proxy HTTP traffic to the server specified in the Host header
     // OPTIONAL: set socket options according to headers (keepalive, etc)?
     proxy_server_request();
 
-    return reqline.valid;
+    return true;
 }
 
 /*
