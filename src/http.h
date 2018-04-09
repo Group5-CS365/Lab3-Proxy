@@ -21,4 +21,18 @@ struct http_request_line parse_http_request_line(char *buf, size_t len);
 
 void debug_http_request_line(struct http_request_line);
 
+
+struct http_header_field {
+    struct {
+        char *p;
+        size_t len;
+    } field_name, field_value;
+    char *end;
+    bool valid;
+};
+
+struct http_header_field parse_http_header_field(char *buf, size_t len);
+
+void debug_http_header_field(struct http_header_field);
+
 #endif // _http_h_

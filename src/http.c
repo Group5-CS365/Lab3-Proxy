@@ -109,3 +109,80 @@ debug_http_request_line(struct http_request_line reqline)
     else
         printf("not a valid HTTP request line\n");
 }
+
+struct http_header_field
+parse_http_header_field(char *buf, size_t len)
+{
+    static char const * const ws = " \t\r\v\f";
+    static size_t const wslen = 5;
+    static char const * const nws = "\r\v\f";
+    static size_t const nwslen = 3;
+
+    char *p = buf, *end = buf + len;
+    struct http_header_field head = { .end = end };
+
+    if (p == end) {
+        fputs("warning: invalid header field (empty)\n", stderr);
+        return head;
+    }
+
+    head.field_name.p = p;
+    p = memchr(p, ':', len);
+    head.field_name.len = p - head.field_name.p;
+
+    ++p; // :
+
+    // Eat white space.
+    while (p != end && memchr(ws, *p, wslen) != NULL)
+        ++p;
+    len -= p - head.field_name.p;
+
+    if (p == end) {
+        fputs("warning: invalid header field (after field name)\n", stderr);
+        fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
+        return head;
+    }
+
+    // Field value
+    head.field_value.p = p;
+    while (p != end && memchr(nws, *p, nwslen) == NULL)
+        ++p;
+    head.field_value.len = p - head.field_value.p;
+
+    // Consume whitespace.
+    while (p != end && memchr(ws, *p, wslen) != NULL)
+        ++p;
+    len -= p - head.field_value.p;
+
+    if (p == end) {
+        fputs("warning: invalid request line (after request target)\n", stderr);
+        fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
+        fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
+        return head;
+    }
+
+    if (*p != '\n') {
+        fputs("warning: invalid request line (after request target)\n", stderr);
+        fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
+        fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
+        return head;
+    }
+
+    head.valid = true;
+    head.end = p + 1;
+
+    return head;
+}
+
+void
+debug_http_header_field(struct http_header_field reqhead)
+{
+    if (reqhead.valid)
+        printf("valid HTTP header field:\n"
+               "\tFIELD NAME: %.*s\n"
+               "\tFIELD VALUE: %.*s\n",
+               (int)reqhead.field_name.len, reqhead.field_name.p,
+               (int)reqhead.field_value.len, reqhead.field_value.p);
+    else
+        printf("not a valid HTTP header field\n");
+}
