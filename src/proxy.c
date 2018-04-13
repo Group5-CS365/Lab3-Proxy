@@ -98,17 +98,23 @@ proxy_cleanup(struct proxy *proxy)
     close(proxy->sockfd);
 }
 
-static bool
-// TODO: proxy_server_request should not be void, needs to take a buffer that
-//       contains the name and port from the http parser, dummy variables have
-//       been used for testing purposes
-proxy_server_request() {
-    int cfd, pid, len, rval;
+static int
+proxy_server_request(struct proxy *proxy, char *buf, size_t len) {
+    int cfd, rval;
     struct addrinfo hint, *aip, *rp;
-    char buf[1024];
-  
+
+    //dummy initialization for testing
+    static char const * const dummy =
+      "GET /index.html HTTP/1.1\r\n"
+      "Host: google.com\r\n"
+      "Accept: */*\r\n"
+      "\r\n";
+    size_t dummylen = strlen(dummy);
+    strcpy (buf, dummy); 
+    len = dummylen;
+    
     // initialize variables
-    pid = getpid();
+    //pid = getpid();
     memset((void *) &hint, 0, sizeof(hint));
   
     // hints will help addrinfo to populate addresses in a certain way
@@ -116,10 +122,8 @@ proxy_server_request() {
     hint.ai_socktype = SOCK_STREAM;   /* TCP socket */
     hint.ai_flags = AI_PASSIVE;       /* For wildcard IP address */
     hint.ai_protocol = 0;             /* Any protocol */
-  
-    const char *name = "http://www.google.com";
 
-    rval = getaddrinfo(name, "8090", &hint, &aip);
+    rval = getaddrinfo(dummy, "80", &hint, &aip);
     if(rval != 0) {
       perror("getaddrinfo(): failed");
       return FAILURE;
@@ -151,7 +155,7 @@ proxy_server_request() {
     }
     else {
       // wait for response
-      printf("%5d read: ", pid);
+      printf("Response: \n%s", buf);
       fwrite(buf, len, 1, stdout);
       fflush(stdout);
     }
@@ -189,7 +193,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
 
     // TODO: proxy HTTP traffic to the server specified in the Host header
     // OPTIONAL: set socket options according to headers (keepalive, etc)?
-    proxy_server_request();
+    proxy_server_request(proxy, buf, len);
 
     return true;
 }
