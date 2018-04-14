@@ -123,9 +123,9 @@ proxy_server_request(struct proxy *proxy, char *buf, size_t len) {
     hint.ai_flags = AI_PASSIVE;       /* For wildcard IP address */
     hint.ai_protocol = 0;             /* Any protocol */
 
-    rval = getaddrinfo(dummy, "80", &hint, &aip);
+    rval = getaddrinfo("www.google.com", "80", &hint, &aip);
     if(rval != 0) {
-      perror("getaddrinfo(): failed");
+      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rval));
       return FAILURE;
     }
 
@@ -147,17 +147,24 @@ proxy_server_request(struct proxy *proxy, char *buf, size_t len) {
 
     freeaddrinfo(aip);
 
+    // write to server
+    len = write(cfd, buf, len);
+    if (len < 0) {
+      perror("error writing to socket");
+      return FAILURE;
+    }
+
+    //    bzero(buf, sizeof(buf));
+
     // read from server
-    len = read(cfd, buf, sizeof(buf));
+    len = read(cfd, buf, RECV_BUFLEN);
     if(len < 1) {
       perror("read");
       return FAILURE;
     }
     else {
       // wait for response
-      printf("Response: \n%s", buf);
-      fwrite(buf, len, 1, stdout);
-      fflush(stdout);
+      fprintf(stderr, "Response: %.*s\n", (int)len, buf); 
     }
     
 return SUCCESS;
