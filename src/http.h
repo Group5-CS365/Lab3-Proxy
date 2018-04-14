@@ -4,15 +4,14 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "iostring.h"
+
 // minimum recommended supported request line length
 // https://tools.ietf.org/html/rfc7230#section-3.1.1
 #define REQUEST_LINE_MIN_BUFLEN 8000
 
 struct http_request_line {
-    struct {
-        char *p;
-        size_t len;
-    } method, request_target, http_version;
+    struct iostring method, request_target, http_version;
     char *end;
     bool valid;
 };
@@ -23,10 +22,7 @@ void debug_http_request_line(struct http_request_line);
 
 
 struct http_header_field {
-    struct {
-        char *p;
-        size_t len;
-    } field_name, field_value;
+    struct iostring field_name, field_value;
     char *end;
     bool valid;
 };
