@@ -254,6 +254,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
     char htmp, ptmp, *p = buf;
+    size_t n = len;
     struct uri uri;
     struct iostring host, port;
     int fd;
@@ -263,17 +264,17 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (!reqline.valid)
         return false;
 
-    len -= p - reqline.end;
+    n -= p - reqline.end;
     p = reqline.end;
 
     if (proxy->verbose) {
-        for (struct http_header_field field = parse_http_header_field(p, len);
+        for (struct http_header_field field = parse_http_header_field(p, n);
              p != end && field.valid;
-             field = parse_http_header_field(p, len)) {
+             field = parse_http_header_field(p, n)) {
 
             debug_http_header_field(field);
 
-            len -= p - field.end;
+            n -= p - field.end;
             p = field.end;
         }
     }
