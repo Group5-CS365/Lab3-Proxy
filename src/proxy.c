@@ -102,83 +102,6 @@ proxy_cleanup(struct proxy *proxy)
     close(proxy->sockfd);
 }
 
-#if 0
-static bool
-// TODO: proxy_server_request should not be void, needs to take a buffer that
-//       contains the name and port from the http parser, dummy variables have
-//       been used for testing purposes
-proxy_server_request() {
-    int cfd, pid, len, done;
-    struct addrinfo hint, *aip, *rp;
-
-    //dummy initialization for testing
-    static char const * const dummy =
-      "GET /index.html HTTP/1.1\r\n"
-      "Host: google.com\r\n"
-      "Accept: */*\r\n"
-      "\r\n";
-    size_t dummylen = strlen(dummy);
-    strcpy (buf, dummy); 
-    len = dummylen;
-    
-    // initialize variables
-    //pid = getpid();
-    memset((void *) &hint, 0, sizeof(hint));
-  
-    // hints will help addrinfo to populate addresses in a certain way
-    hint.ai_family = AF_UNSPEC;       /* Allow for IPv4 or IPv6 */
-    hint.ai_socktype = SOCK_STREAM;   /* TCP socket */
-    hint.ai_flags = AI_PASSIVE;       /* For wildcard IP address */
-    hint.ai_protocol = 0;             /* Any protocol */
-
-    rval = getaddrinfo("www.google.com", "80", &hint, &aip);
-    if(rval != 0) {
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rval));
-      return FAILURE;
-    }
-
-    for (rp = aip; rp != NULL; rp = rp->ai_next) {
-        cfd = socket(rp->ai_family,
-                 rp->ai_socktype,
-                 rp->ai_protocol);
-        if (cfd == -1)
-            continue;
-        if (connect(cfd, rp->ai_addr, rp->ai_addrlen) != -1)
-            break; // success!
-        close(cfd);
-    }
-
-    if(rp == NULL) {
-      perror("getaddrinfo(): could not connect");
-      return FAILURE;
-    }
-
-    freeaddrinfo(aip);
-
-    // write to server
-    len = write(cfd, buf, len);
-    if (len < 0) {
-      perror("error writing to socket");
-      return FAILURE;
-    }
-
-    //    bzero(buf, sizeof(buf));
-
-    // read from server
-    len = read(cfd, buf, RECV_BUFLEN);
-    if(len < 1) {
-      perror("read");
-      return FAILURE;
-    }
-    else {
-      // wait for response
-      fprintf(stderr, "Response: %.*s\n", (int)len, buf); 
-    }
-    
-return SUCCESS;
-}
-#endif
-
 /*
  * Connect to the server specified in a request.
  * Returns FAILURE if connection failed, otherwise a connected socket FD.
@@ -186,12 +109,36 @@ return SUCCESS;
 static int
 connect_server(char *host, char *port)
 {
-    //int fd;
+    int fd, rval;
+    struct addrinfo *aip, hint = {
+        // hints will help addrinfo to populate addr in a specific way
+        .ai_family   = AF_UNSPEC,
+        .ai_socktype = SOCK_STREAM,   // TCP info
+        .ai_flags    = AI_PASSIVE,    // use my IP address
+    };
 
-    // TODO: parts of proxy_server_request() go in here
-    return FAILURE;
+    rval = getaddrinfo(host, port, &hint, &aip);
+    if (rval != SUCCESS) {
+        fprintf(stderr, "connect_server: failed to get address info: %s\n",
+                gai_strerror(rval));
+        return FAILURE;
+    }
 
-    //return fd;
+    for (struct addrinfo *rp = aip; rp != NULL; rp = rp->ai_next) {
+        fd = socket(rp->ai_family,
+                    rp->ai_socktype,
+                    rp->ai_protocol);
+        if (fd == FAILURE)
+            continue;
+        if (connect(fd, rp->ai_addr, rp->ai_addrlen) != FAILURE)
+            break; // success!
+        close(fd);
+        fd = FAILURE;
+    }
+
+    freeaddrinfo(aip);
+
+    return fd;
 }
 
 /*
@@ -238,7 +185,7 @@ recv_response(int fd, char *buf, size_t len)
 static bool
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
 {
-    // TODO: parts of proxy_server_request() go in here? (eg debug output)
+    fprintf(stderr, "Response: %.*s\n", (int)len, buf);
     return true;
 }
 
@@ -269,7 +216,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     if (proxy->verbose) {
         for (struct http_header_field field = parse_http_header_field(p, n);
-             p != end && field.valid;
+             p < end && field.valid;
              field = parse_http_header_field(p, n)) {
 
             debug_http_header_field(field);
