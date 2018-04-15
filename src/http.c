@@ -131,14 +131,16 @@ parse_http_header_field(char *buf, size_t len)
     p = memchr(p, ':', len);
     head.field_name.len = p - head.field_name.p;
 
-    ++p; // :
+    if (p != NULL) {
+        ++p; // :
 
-    // Eat white space.
-    while (p != end && memchr(ws, *p, wslen) != NULL)
-        ++p;
-    len -= p - head.field_name.p;
+        // Eat white space.
+        while (p < end && memchr(ws, *p, wslen) != NULL)
+            ++p;
+        len -= p - head.field_name.p;
+    }
 
-    if (p == end) {
+    if (p == end || p == NULL) {
         fputs("warning: invalid header field (after field name)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         return head;

@@ -6,7 +6,6 @@
 
 #include "iostring.h"
 
-// This is getting ridiculous. We need a `struct string`-like type.
 struct uri {
     struct iostring scheme, path_query_fragment;
     struct {
