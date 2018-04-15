@@ -107,7 +107,7 @@ debug_http_request_line(struct http_request_line reqline)
                (int)reqline.request_target.len, reqline.request_target.p,
                (int)reqline.http_version.len, reqline.http_version.p);
     else
-        printf("not a valid HTTP request line\n");
+        puts("not a valid HTTP request line");
 }
 
 struct http_header_field
@@ -186,5 +186,5 @@ debug_http_header_field(struct http_header_field reqhead)
                (int)reqhead.field_name.len, reqhead.field_name.p,
                (int)reqhead.field_value.len, reqhead.field_value.p);
     else
-        printf("not a valid HTTP header field\n");
+        puts("not a valid HTTP header field");
 }
