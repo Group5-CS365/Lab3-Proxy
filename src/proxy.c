@@ -147,18 +147,24 @@ connect_server(char *host, char *port)
 static ssize_t
 send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
 {
-    size_t path_offset = uri.path_query_fragment.p - reqln.method.p;
-    size_t rest_len = len - path_offset;
+    // FIXME: temporary hack to make this work with dummy uri data.
+    size_t version_offset = reqln.http_version.p - reqln.method.p - 1;
+    size_t rest_len = len - version_offset;
     // Request parts:
     // * Method
-    // * The rest (request path & version & headers & body)
+    // * Request path
+    // * The rest (SP+version & headers & body)
     struct iovec parts[] = {
         { // Method
             .iov_base = reqln.method.p,
             .iov_len = reqln.method.len + 1
         },
-        { // The rest
+        { // Request path
             .iov_base = uri.path_query_fragment.p,
+            .iov_len = uri.path_query_fragment.len
+        },
+        { // The rest
+            .iov_base = reqln.http_version.p - 1,
             .iov_len = rest_len
         },
     };
@@ -238,7 +244,8 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     // Temporarily nul-terminate the host and port strings.
     htmp = host.p[host.len];
-    host.p[host.len] = '\0';
+    if (htmp != '\0') // FIXME: `if` is a temporary hack to test with dummy URI
+        host.p[host.len] = '\0';
     ptmp = port.p[port.len];
     if (ptmp != '\0') // The default port is already terminated.
         port.p[port.len] = '\0';
@@ -250,7 +257,8 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     }
 
     // Restore original values.
-    host.p[host.len] = htmp;
+    if (htmp != '\0') // FIXME: `if` is a temporary hack to test with dummy URI
+        host.p[host.len] = htmp;
     if (ptmp != '\0')
         port.p[port.len] = ptmp;
 
