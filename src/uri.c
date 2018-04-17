@@ -9,7 +9,7 @@ parse_uri(char *buf, size_t len)
 //	static char const * const crlf = "\r\n";
 //	static size_t const crlflen = 2;
 	static char const * const fslash = "/:";
-	static size_t const wslen = 5;
+	static size_t const cl = 2;
 
 	char *p = buf, *end = buf + len;
 	struct uri site = { .end = end };
@@ -27,7 +27,7 @@ parse_uri(char *buf, size_t len)
 	++p; // :
 
 	// Eat Forward Slashes
-	while (p != end && memchr(fslash, *p, wslen) != NULL)
+	while (p != end && memchr(fslash, *p, cl) != NULL)
 		++p;
 	len -= p - site.scheme.p;
 
@@ -39,12 +39,12 @@ parse_uri(char *buf, size_t len)
 
 	// Host
 	site.host.p = p;
-	while (p != end && memchr(fslash, *p, wslen) == NULL)
+	while (p != end && memchr(fslash, *p, cl) == NULL)
 		++p;
 	site.host.len = p - site.host.p;
 
 	// Eat colon or forwardslash
-	while (p != end && memchr(fslash, *p, wslen) != NULL)
+	while (p != end && memchr(fslash, *p, cl) != NULL)
 		++p;
 	len -= p - site.host.p;
 
@@ -58,12 +58,12 @@ parse_uri(char *buf, size_t len)
 	
 	// Port
 	site.port.p = p;
-	while (p != end && memchr(fslash, *p, wslen) == NULL)
+	while (p != end && memchr(fslash, *p, cl) == NULL)
 		++p;
 	site.port.len = p - site.port.p;
 
 	// Eat colon or forwardslash
-	while (p != end && memchr(fslash, *p, wslen) != NULL)
+	while (p != end && memchr(fslash, *p, cl) != NULL)
 		++p;
 	len -= p - site.port.p;
 
