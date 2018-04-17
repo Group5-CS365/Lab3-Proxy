@@ -20,6 +20,7 @@
 #include <netinet/in.h>
 
 #include "http.h"
+#include "uri.h"
 
 enum { SUCCESS = 0, FAILURE = -1 };
 
@@ -176,8 +177,10 @@ proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
     if (!reqline.valid)
         return false;
 
+    struct uri requri = parse_uri(reqline.request_target.p, reqlin.request_target.len);
+
     len -= buf - reqline.end;
-    buf = reqline.end;
+    buf = reqlinie.end;
 
     for (struct http_header_field field = parse_http_header_field(buf, len);
          buf != end && field.valid;
