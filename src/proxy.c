@@ -181,7 +181,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
     len -= buf - reqline.end;
     buf = reqline.end;
 
-
+    /*
     for (struct http_header_field field = parse_http_header_field(buf, len);
          buf != end && field.valid;
          field = parse_http_header_field(buf, len)) {
@@ -189,13 +189,15 @@ proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
         len -= buf - field.end;
         buf = field.end;
     }
+    */
+    (void)end;
 
     uri = parse_uri(reqline.request_target.p, reqline.request_target.len);
 
     debug_uri(uri);
 
     if (!uri.valid)
-	return false;
+        return false;
 
     // TODO: proxy HTTP traffic to the server specified in the Host header
     // OPTIONAL: set socket options according to headers (keepalive, etc)?
