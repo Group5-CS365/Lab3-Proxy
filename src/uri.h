@@ -7,7 +7,7 @@
 
 struct uri {
 	struct {
-		char wp;
+		char *p;
 		size_t len;
 	} scheme, host, port, path_query_fragment;
 	char *end;

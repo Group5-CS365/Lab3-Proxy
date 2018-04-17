@@ -105,11 +105,10 @@ debug_uri(struct uri reqhead)
 			"\tHOST: %.*s\n"
 			"\tPORT: %.*s\n"
 			"\tPATH QUERY FRAGMENT: %.*s\n",
-			(int)site.scheme.len, site.scheme.p,
-			(int)site.host.len, site.host.p,
-			(int)site.port.len, site.port.p,
-			(int)site.path_query_fragment.len, site.path_query_fragment.p);
+			(int)reqhead.scheme.len, reqhead.scheme.p,
+			(int)reqhead.host.len, reqhead.host.p,
+			(int)reqhead.port.len, reqhead.port.p,
+			(int)reqhead.path_query_fragment.len, reqhead.path_query_fragment.p);
 	else
 		printf("not a valid URI\n");
-                return site;
 }
