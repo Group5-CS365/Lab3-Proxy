@@ -30,6 +30,36 @@ enum { SUCCESS = 0, FAILURE = -1 };
 #define LISTEN_BACKLOG 8 // FIXME: what is a good value for this?
 #define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
 
+#ifdef __linux__
+#include <fcntl.h>
+#else
+#define BUFLEN 4096
+static ssize_t
+splice(int fd_in, void *_off_in,
+       int fd_out, void *_off_out,
+       size_t len, unsigned int _flags)
+{
+    char buf[BUFLEN];
+    int res;
+
+    while (len) {
+        res = read(fd_in, buf, BUFLEN);
+        if (res == FAILURE) {
+            perror("splice(): read failed");
+            return FAILURE;
+        }
+        res = write(fd_out, buf, res);
+        if (res == FAILURE) {
+            perror("splice(): write failed");
+            return FAILURE;
+        }
+        len -= res;
+    }
+
+    return len;
+}
+#endif
+
 struct proxy {
     int sockfd;
     bool verbose;
@@ -183,15 +213,46 @@ recv_response(int fd, char *buf, size_t len)
 }
 
 /*
+ * Send an HTTP response to the client.
+ */
+static ssize_t
+send_response(int server_fd, int client_fd, char *buf, size_t len, size_t more)
+{
+    int res;
+
+    res = write(client_fd, buf, len);
+    if (res == FAILURE) {
+        perror("send_response(): failed to write response buffer");
+        return FAILURE;
+    }
+
+    if (more) {
+        res = splice(server_fd, NULL, client_fd, NULL, more, 0);
+        if (res == FAILURE) {
+            perror("send_response(): failed to splice response data");
+            return FAILURE;
+        }
+    }
+
+    return len + more;
+}
+
+/*
  * Handle a response from the server.
  * Returns true to indicate proxy_recv_request() should be called again,
  * or false to indicate the connection has been closed.
  * Exits on error.
  */
 static bool
-proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
+proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
 {
     fprintf(stderr, "Response: %.*s\n", (int)len, buf);
+
+    if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {
+        // TODO: error message?
+        return false;
+    }
+
     return true;
 }
 
@@ -270,9 +331,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     len = recv_response(fd, buf, buflen);
 
-    close(fd);
-
-    return proxy_handle_response(proxy, buf, len);
+    return proxy_handle_response(proxy, fd, buf, len);
 }
 
 /*
