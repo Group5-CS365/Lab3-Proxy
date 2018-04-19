@@ -1,7 +1,10 @@
 This file contains the quick description and status of all the test scripts
-  Only errors will be reported
+  Only errors will be reported here
+must have executable "proxy" in local folder to run testScripts
 
-scriptChmod: chmods all the script files to be executable
+
+testScripts: chmods all the script files and executes
+chmodAll: chmods all scripts
 
 1 : Basic test nothing special for scripts 3-13
 2 :
