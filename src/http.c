@@ -173,16 +173,15 @@ parse_http_status_line(char *buf, size_t len)
 
     // Reason phrase
     line.reason_phrase.p = p;
-    while (p != end && memchr(ws, *p, wslen) == NULL)
-        ++p;
+    p = memchr(p, '\r', len);
     line.reason_phrase.len = p - line.reason_phrase.p;
 
-    // Consume whitespace.
-    while (p != end && memchr(ws, *p, wslen) != NULL)
-        ++p;
-    len -= p - line.reason_phrase.p;
+    if (p != NULL) {
+        ++p; // CR
+        len -= p - line.reason_phrase.p;
+    }
 
-    if (p == end) {
+    if (p == end || p == NULL) {
         fputs("warning: invalid status line (after reason phrase)\n", stderr);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
         fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
