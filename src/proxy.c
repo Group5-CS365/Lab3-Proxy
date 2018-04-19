@@ -251,17 +251,50 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
     char *p = buf;
     size_t n = len;
 
-    debug_http_status_line(statline);
+    if (proxy->verbose)
+        debug_http_status_line(statline);
 
-    if (!statline.valid)
-        return false;
-
-    fprintf(stderr, "Response: %.*s\n", (int)len, buf);
-
-    if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {
-        // TODO: error message?
+    if (!statline.valid) {
+        if (proxy->verbose)
+            fputs("malformed response (invalid status line)\n", stderr);
+        close(server_fd);
         return false;
     }
+
+    if (proxy->verbose)
+        fprintf(stderr, "*** begin response ***\n%.*s\n*** end response ***\n", (int)len, buf);
+
+    n -= p - statline.end;
+    p = statline.end;
+
+    for (struct http_header_field field = parse_http_header_field(p, n);
+         p < end && *p != '\r' && field.valid;
+         field = parse_http_header_field(p, n)) {
+
+        if (proxy->verbose)
+            debug_http_header_field(field);
+
+        n -= p - field.end;
+        p = field.end;
+    }
+
+    // Skip over CRLF.
+    n -= 2;
+    p += 2;
+    if (p > end) {
+        if (proxy->verbose)
+            fputs("malformed response (too short)\n", stderr);
+        close(server_fd);
+        return false;
+    }
+
+    if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {
+        fputs("proxy_handle_response(): failed to send response", stderr);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    close(server_fd);
 
     return true;
 }
@@ -283,32 +316,48 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     struct iostring host, port;
     int fd;
 
-    debug_http_request_line(reqline);
+    if (proxy->verbose)
+        debug_http_request_line(reqline);
 
-    if (!reqline.valid)
+    if (!reqline.valid) {
+        if (proxy->verbose)
+            fputs("malformed request (invalid request line)\n", stderr);
         return false;
+    }
 
     n -= p - reqline.end;
     p = reqline.end;
 
-    if (proxy->verbose) {
-        for (struct http_header_field field = parse_http_header_field(p, n);
-             p < end && field.valid;
-             field = parse_http_header_field(p, n)) {
+    for (struct http_header_field field = parse_http_header_field(p, n);
+         p < end && *p != '\r' && field.valid;
+         field = parse_http_header_field(p, n)) {
 
+        if (proxy->verbose)
             debug_http_header_field(field);
 
-            n -= p - field.end;
-            p = field.end;
-        }
+        n -= p - field.end;
+        p = field.end;
+    }
+
+    // Skip over CRLF.
+    n -= 2;
+    p += 2;
+    if (p > end) {
+        if (proxy->verbose)
+            fputs("malformed request (too short)\n", stderr);
+        return false;
     }
 
     uri = parse_uri(reqline.request_target.p, reqline.request_target.len);
 
-    debug_uri(uri);
+    if (proxy->verbose)
+        debug_uri(uri);
 
-    if (!uri.valid)
+    if (!uri.valid) {
+        if (proxy->verbose)
+            fputs("malformed request (invalid URI)\n", stderr);
         return false;
+    }
 
     host = uri.authority.host;
     port = uri.authority.port;
@@ -323,7 +372,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     fd = connect_server(host.p, port.p);
     if (fd == FAILURE) {
-        fprintf(stderr, "failed to connect to server\n");
+        fputs("proxy_handle_request(): failed to connect to server\n", stderr);
         exit(EXIT_FAILURE);
     }
 
@@ -334,12 +383,17 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         port.p[port.len] = ptmp;
 
     if (send_request(fd, reqline, uri, len) == FAILURE) {
-        fprintf(stderr, "failed to send request\n");
+        fputs("failed to send request\n", stderr);
         close(fd);
         exit(EXIT_FAILURE);
     }
 
     len = recv_response(fd, buf, buflen);
+    if (len == FAILURE) {
+        fputs("failed to receive response\n", stderr);
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
 
     return proxy_handle_response(proxy, fd, buf, len);
 }
