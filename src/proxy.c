@@ -31,6 +31,7 @@ enum { SUCCESS = 0, FAILURE = -1 };
 #define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
 
 #ifdef __linux__
+#define _GNU_SOURCE
 #include <fcntl.h>
 #else
 #define BUFLEN 4096
