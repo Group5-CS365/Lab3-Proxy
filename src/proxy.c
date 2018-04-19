@@ -246,6 +246,16 @@ send_response(int server_fd, int client_fd, char *buf, size_t len, size_t more)
 static bool
 proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
 {
+    char const * const end = buf + len;
+    struct http_status_line statline = parse_http_status_line(buf, len);
+    char *p = buf;
+    size_t n = len;
+
+    debug_http_status_line(statline);
+
+    if (!statline.valid)
+        return false;
+
     fprintf(stderr, "Response: %.*s\n", (int)len, buf);
 
     if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {

@@ -9,6 +9,7 @@
 // minimum recommended supported request line length
 // https://tools.ietf.org/html/rfc7230#section-3.1.1
 #define REQUEST_LINE_MIN_BUFLEN 8000
+#define STATUS_LINE_MIN_BUFLEN 8000
 
 struct http_request_line {
     struct iostring method, request_target, http_version;
@@ -20,6 +21,15 @@ struct http_request_line parse_http_request_line(char *buf, size_t len);
 
 void debug_http_request_line(struct http_request_line);
 
+struct http_status_line {
+    struct iostring http_version, status_code, reason_phrase;
+    char *end;
+    bool valid;
+};
+
+struct http_status_line parse_http_status_line(char *buf, size_t len);
+
+void debug_http_status_line(struct http_status_line);
 
 struct http_header_field {
     struct iostring field_name, field_value;
