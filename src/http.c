@@ -118,10 +118,8 @@ parse_http_status_line(char *buf, size_t len)
     static char const * const ws = " \t\r\v\f";
     static size_t const wslen = 5;
 
-    char *p = buf, *end = buf + len, *statend = memchr(crlf, *p, crlflen);
-    statend += 2;
-    struct http_status_line line = { .end = statend };
-
+    char *p = buf, *end = buf + len;
+    struct http_status_line line = { .end = end };
 
     /************************ NOT SURE IF THIS IS NEEDED *********************/
     // Consume leading CRLFs.
