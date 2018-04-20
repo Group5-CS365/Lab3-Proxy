@@ -11,6 +11,7 @@ struct uri {
     struct {
         struct iostring host, port;
     } authority;
+    char *end;
     bool valid;
 };
 
