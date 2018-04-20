@@ -14,7 +14,8 @@ proxy: $(objs)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 test: proxy
-	env PATH=$(shell pwd):${PATH} kyua test
+	. ./.test-env
+	kyua test
 
 clean:
 	rm -rf $(objs) proxy
