@@ -72,6 +72,8 @@ struct proxy {
 static int
 proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
 {
+    int const option = 1;
+
     int fd;
     struct sockaddr_in sa;
 
@@ -87,13 +89,10 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
     sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_port = htons(port);
 
-    const int option = 1;
-
-    //setsockopt to reuse address
-    if(setsockopt(fd, SOL_SOCKET,SO_REUSEADDR, (char*)&option, sizeof(option)) == FAILURE) {
-      perror("setsockopt(): failed to set socket to reuse address\n");
-      close(fd);
-      return FAILURE;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof option) == FAILURE) {
+        perror("setsockopt(): failed to set socket to reuse address\n");
+        close(fd);
+        return FAILURE;
     }
 
     if (bind(fd, (struct sockaddr *)&sa, sizeof sa) == FAILURE) {
