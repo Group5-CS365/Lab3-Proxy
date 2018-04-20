@@ -1,0 +1,7 @@
+syntax(2)
+
+test_suite('basic')
+
+atf_test_program{name="help"}
+atf_test_program{name="requests"}
+plain_test_program{name="script1", required_programs="nc proxy"}

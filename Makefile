@@ -13,7 +13,10 @@ all: proxy
 proxy: $(objs)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
+test: proxy
+	env PATH=$(shell pwd):${PATH} kyua test
+
 clean:
 	rm -rf $(objs) proxy
 
-.PHONY: all clean
+.PHONY: all test clean

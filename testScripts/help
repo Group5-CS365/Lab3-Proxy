@@ -1,0 +1,15 @@
+#! /usr/bin/env atf-sh
+
+atf_test_case hflag
+hflag_head() {
+    atf_set "require.progs" proxy
+    atf_set "descr" "Tests that the -h flag works correctly to show" \
+                    "a help message"
+}
+hflag_body() {
+    atf_check -o match:usage proxy -h
+}
+
+atf_init_test_cases() {
+    atf_add_test_case hflag
+}

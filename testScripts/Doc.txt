@@ -1,0 +1,28 @@
+This file contains the quick description and status of all the test scripts
+  Only errors will be reported here
+must have executable "proxy" in local folder to run testScripts
+
+
+testScripts: chmods all the script files and executes
+chmodAll: chmods all scripts
+
+1 : Basic test nothing special for scripts 3-13
+2 :
+3 : modified SERVER_PORT to run on different port number
+4 : modified PROXY_PORT to accept different port number
+5 : capital letters changed to lowercase
+6 : change Proxy-Connection to closed
+7 : Proxy-Connection left empty
+8 : Proxy-Connection removed
+9 : User-Agent date removed
+10: User-Agent field removed
+11: the GET has been made lowercase     //Might not be working, not sure
+12: removed "User-Agent", " Accept", "Proxy-Connection"   //Might not be working, not sure
+13: removed "User-Agent", " Accept", "Proxy-Connection" , "Host"  //Might not be working, not sure
+14:
+15:
+16:
+17:
+18:
+19:
+20:

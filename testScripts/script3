@@ -1,0 +1,48 @@
+#! /bin/sh
+
+
+#	Works on diffrent ports All is good
+
+
+# use this in vim if not working ->    :set fileformat=unix
+ TESTNO=${1}  # use TESTNO to select a test case
+
+SERVER_PORT=12335 		#modified
+PROXY_PORT=54321
+
+run_proxy() {
+	# ./proxy ${1}
+	nc -l ${1} | sed -e "s#GET http://localhost:${SERVER_PORT}#GET #" -e "/Proxy-Connection/d"| nc localhost ${SERVER_PORT}
+}
+
+echo -e "GET http://localhost:${SERVER_PORT}/ HTTP/1.1\r
+Host: localhost:${SERVER_PORT}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+" > test.in
+
+echo -e "GET / HTTP/1.1\r
+Host: localhost:${SERVER_PORT}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+" > test.ok
+
+echo "Running server"
+nc -l ${SERVER_PORT} > tmp.out &
+
+echo "Running proxy"
+run_proxy ${PROXY_PORT} &
+
+echo "Running client"
+#nc localhost ${PROXY_PORT} < test.in
+nc localhost ${PROXY_PORT} < test${TESTNO}.in
+
+# cleanup
+# rm tmp.out
+kill %1
+kill %2
+
+diff -u tmp.out test.ok
