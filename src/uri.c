@@ -49,6 +49,14 @@ parse_uri(char *buf, size_t len)
     }
 
     if (*p == ':') {
+        // :
+        if (++p == end || *p == '/') {
+            fputs("warning: invalid uri (empty port)\n", stderr);
+            fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
+            fprintf(stderr, "HOST: %.*s\n", (int)site.authority.host.len, site.authority.host.p);
+            return site;
+        }
+
         // Port
         site.authority.port.p = p;
         while (p != end && memchr(delims, *p, delimslen) == NULL)
@@ -62,7 +70,6 @@ parse_uri(char *buf, size_t len)
             fprintf(stderr, "PORT: %.*s\n", (int)site.authority.port.len, site.authority.port.p);
             return site;
         }
-
     }
     else {
         site.authority.port.p = (char *)"80"; // FIXME: not ideal...
