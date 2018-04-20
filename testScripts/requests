@@ -71,7 +71,7 @@ request3_head() {
     base_head
 }
 request3_body() {
-    echo -e "GET http://blue.cs.sonoma.edu:3333/page_name.html HTTP/1.0\r
+    echo -e "GET http://blue.cs.sonoma.edu/page_name.html HTTP/1.0\r
 Host: blue.cs.sonoma.edu:3333\r
 Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
 Accept-Encoding: gzip, bzip2\r
@@ -80,7 +80,7 @@ User-Agent: Lynx/2.8.9dev.4 libwww-FM/2.14 SSL-MM/1.4.1 OpenSSL/1.0.1k-fips\r
 \r
 " > test.in
 
-    echo -e "GET http://blue.cs.sonoma.edu:3333/page_name.html HTTP/1.0\r
+    echo -e "GET /page_name.html HTTP/1.0\r
 Host: blue.cs.sonoma.edu:3333\r
 Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
 Accept-Encoding: gzip, bzip2\r
