@@ -176,13 +176,16 @@ connect_server(char *host, char *port)
 static ssize_t
 send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
 {
-    // FIXME: temporary hack to make this work with dummy uri data.
-    size_t version_offset = reqln.http_version.p - reqln.method.p - 1;
-    size_t rest_len = len - version_offset;
     // Request parts:
     // * Method
-    // * Request path
+    // * Request path (minus proxy-to URI component)
     // * The rest (SP+version & headers & body)
+    //
+    // Using iovecs we can remove the URI from the request by skipping over it,
+    // while only needing to make one syscall.
+    // TODO: We also should be skipping the Proxy-Connection header somehow.
+    size_t version_offset = reqln.http_version.p - reqln.method.p - 1; // -1 for SP
+    size_t rest_len = len - version_offset;
     struct iovec parts[] = {
         { // Method
             .iov_base = reqln.method.p,
@@ -195,9 +198,10 @@ send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
         { // The rest
             .iov_base = reqln.http_version.p - 1,
             .iov_len = rest_len
-        },
+        }
     };
 
+    // TODO: Error handling
     return writev(fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
@@ -207,7 +211,7 @@ send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
 static ssize_t
 recv_response(int fd, char *buf, size_t len)
 {
-    // TODO: more parts of proxy_server_request() go in here?
+    // TODO: Error handling
     return read(fd, buf, len);
 }
 
@@ -367,10 +371,9 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     // Temporarily nul-terminate the host and port strings.
     htmp = host.p[host.len];
-    if (htmp != '\0') // FIXME: `if` is a temporary hack to test with dummy URI
-        host.p[host.len] = '\0';
+    host.p[host.len] = '\0';
     ptmp = port.p[port.len];
-    if (ptmp != '\0') // The default port is already terminated.
+    if (ptmp != '\0') // The default port is already terminated (and const).
         port.p[port.len] = '\0';
 
     fd = connect_server(host.p, port.p);
@@ -380,8 +383,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     }
 
     // Restore original values.
-    if (htmp != '\0') // FIXME: `if` is a temporary hack to test with dummy URI
-        host.p[host.len] = htmp;
+    host.p[host.len] = htmp;
     if (ptmp != '\0')
         port.p[port.len] = ptmp;
 
