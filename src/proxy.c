@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/uio.h>
 #include <sys/wait.h>
 
 #include <assert.h>
@@ -13,6 +14,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
 #include <netdb.h>
 
@@ -20,12 +22,43 @@
 #include <netinet/in.h>
 
 #include "http.h"
+#include "iostring.h"
 #include "uri.h"
 
 enum { SUCCESS = 0, FAILURE = -1 };
 
 #define LISTEN_BACKLOG 8 // FIXME: what is a good value for this?
 #define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
+
+#ifdef __linux__
+#include <fcntl.h>
+#else
+#define BUFLEN 4096
+static ssize_t
+splice(int fd_in, void *_off_in,
+       int fd_out, void *_off_out,
+       size_t len, unsigned int _flags)
+{
+    char buf[BUFLEN];
+    int res;
+
+    while (len) {
+        res = read(fd_in, buf, BUFLEN);
+        if (res == FAILURE) {
+            perror("splice(): read failed");
+            return FAILURE;
+        }
+        res = write(fd_out, buf, res);
+        if (res == FAILURE) {
+            perror("splice(): write failed");
+            return FAILURE;
+        }
+        len -= res;
+    }
+
+    return len;
+}
+#endif
 
 struct proxy {
     int sockfd;
@@ -39,6 +72,8 @@ struct proxy {
 static int
 proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
 {
+    int const option = 1;
+
     int fd;
     struct sockaddr_in sa;
 
@@ -54,13 +89,10 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
     sa.sin_addr.s_addr = INADDR_ANY;
     sa.sin_port = htons(port);
 
-    const int option = 1;
-
-    //setsockopt to reuse address
-    if(setsockopt(fd, SOL_SOCKET,SO_REUSEADDR, (char*)&option, sizeof(option)) == FAILURE) {
-      perror("setsockopt(): failed to set socket to reuse address\n");
-      close(fd);
-      return FAILURE;
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &option, sizeof option) == FAILURE) {
+        perror("setsockopt(): failed to set socket to reuse address\n");
+        close(fd);
+        return FAILURE;
     }
 
     if (bind(fd, (struct sockaddr *)&sa, sizeof sa) == FAILURE) {
@@ -99,65 +131,177 @@ proxy_cleanup(struct proxy *proxy)
     close(proxy->sockfd);
 }
 
-static bool
-// TODO: proxy_server_request should not be void, needs to take a buffer that
-//       contains the name and port from the http parser, dummy variables have
-//       been used for testing purposes
-proxy_server_request() {
-    int cfd, pid, len, done;
-    struct addrinfo hint, *aip, *rp;
-    char buf[1024];
+/*
+ * Connect to the server specified in a request.
+ * Returns FAILURE if connection failed, otherwise a connected socket FD.
+ */
+static int
+connect_server(char *host, char *port)
+{
+    int fd, rval;
+    struct addrinfo *aip, hint = {
+        // hints will help addrinfo to populate addr in a specific way
+        .ai_family   = AF_UNSPEC,
+        .ai_socktype = SOCK_STREAM,   // TCP info
+        .ai_flags    = AI_PASSIVE,    // use my IP address
+    };
 
-    // initialize variables
-    pid = getpid();
-    done = 0;
-    memset((void *) &hint, 0, sizeof(hint));
-
-    // hints will help addrinfo to populate addr in a specific way
-    hint.ai_family = AF_UNSPEC;
-    hint.ai_socktype = SOCK_STREAM;   // TCP info
-    hint.ai_flags = AI_PASSIVE;       // use my IP address
-
-    const char* name = "http://www.google.com";
-
-    getaddrinfo(name, "8090", &hint, &aip);
-    for (rp = aip; rp != NULL; rp = rp->ai_next) {
-        cfd = socket(rp->ai_family,
-                 rp->ai_socktype,
-                 rp->ai_protocol);
-        if (cfd == -1)
-            continue;
-        if (connect(cfd, rp->ai_addr, rp->ai_addrlen) != -1)
-            break; // success!
-        close(cfd);
+    rval = getaddrinfo(host, port, &hint, &aip);
+    if (rval != SUCCESS) {
+        fprintf(stderr, "connect_server: failed to get address info: %s\n",
+                gai_strerror(rval));
+        return FAILURE;
     }
-    // exit_msg(rp == NULL, "Error trying to connect");
 
-    do {
-        // prompt user for input
-        printf("%5d > ", pid);
-        fflush(stdout);
+    for (struct addrinfo *rp = aip; rp != NULL; rp = rp->ai_next) {
+        fd = socket(rp->ai_family,
+                    rp->ai_socktype,
+                    rp->ai_protocol);
+        if (fd == FAILURE)
+            continue;
+        if (connect(fd, rp->ai_addr, rp->ai_addrlen) != FAILURE)
+            break; // success!
+        close(fd);
+        fd = FAILURE;
+    }
 
-        if ((len = read(0, buf, sizeof(buf))) > 0) {
-            if (buf[0] == '.') done = 1;
-
-            // TODO: add DNS lookup
-            printf("%5d write: ", pid);
-            fwrite(buf, len, 1, stdout);
-            fflush(stdout);
-
-            write(cfd, buf, len);
-
-            // wait for response
-            if ((len = read(cfd, buf, sizeof(buf))) > 0) {
-                printf("%5d read: ", pid);
-                fwrite(buf, len, 1, stdout);
-                fflush(stdout);
-            }
-        }
-    } while (!done);
     freeaddrinfo(aip);
-    return 0;
+
+    return fd;
+}
+
+/*
+ * Send the parts of the new HTTP request to the server.
+ */
+static ssize_t
+send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
+{
+    // Request parts:
+    // * Method
+    // * Request path (minus proxy-to URI component)
+    // * The rest (SP+version & headers & body)
+    //
+    // Using iovecs we can remove the URI from the request by skipping over it,
+    // while only needing to make one syscall.
+    // TODO: We also should be skipping the Proxy-Connection header somehow.
+    size_t version_offset = reqln.http_version.p - reqln.method.p - 1; // -1 for SP
+    size_t rest_len = len - version_offset;
+    struct iovec parts[] = {
+        { // Method
+            .iov_base = reqln.method.p,
+            .iov_len = reqln.method.len + 1
+        },
+        { // Request path
+            .iov_base = uri.path_query_fragment.p,
+            .iov_len = uri.path_query_fragment.len
+        },
+        { // The rest
+            .iov_base = reqln.http_version.p - 1,
+            .iov_len = rest_len
+        }
+    };
+
+    // TODO: Error handling
+    return writev(fd, parts, sizeof parts / sizeof (struct iovec));
+}
+
+/*
+ * Receive an HTTP response from the server.
+ */
+static ssize_t
+recv_response(int fd, char *buf, size_t len)
+{
+    // TODO: Error handling
+    return read(fd, buf, len);
+}
+
+/*
+ * Send an HTTP response to the client.
+ */
+static ssize_t
+send_response(int server_fd, int client_fd, char *buf, size_t len, size_t more)
+{
+    int res;
+
+    res = write(client_fd, buf, len);
+    if (res == FAILURE) {
+        perror("send_response(): failed to write response buffer");
+        return FAILURE;
+    }
+
+    if (more) {
+        res = splice(server_fd, NULL, client_fd, NULL, more, 0);
+        if (res == FAILURE) {
+            perror("send_response(): failed to splice response data");
+            return FAILURE;
+        }
+    }
+
+    return len + more;
+}
+
+/*
+ * Handle a response from the server.
+ * Returns true to indicate proxy_recv_request() should be called again,
+ * or false to indicate the connection has been closed.
+ * Exits on error.
+ */
+static bool
+proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
+{
+    char const * const end = buf + len;
+    struct http_status_line statline = parse_http_status_line(buf, len);
+    char *p = buf;
+    size_t n = len;
+
+    if (proxy->verbose)
+        debug_http_status_line(statline);
+
+    if (!statline.valid) {
+        if (proxy->verbose)
+            fputs("malformed response (invalid status line)\n", stderr);
+        close(server_fd);
+        return false;
+    }
+
+    if (proxy->verbose)
+        fprintf(stderr, "*** begin response ***\n%.*s\n*** end response ***\n", (int)len, buf);
+
+    n -= p - statline.end;
+    p = statline.end;
+
+    for (struct http_header_field field;
+         p < end && *p != '\r';
+         n -= p - field.end, p = field.end) {
+
+        field = parse_http_header_field(p, n);
+
+        if (!field.valid)
+            continue;
+
+        if (proxy->verbose)
+            debug_http_header_field(field);
+    }
+
+    // Skip over CRLF.
+    n -= 2;
+    p += 2;
+    if (p > end) {
+        if (proxy->verbose)
+            fputs("malformed response (too short)\n", stderr);
+        close(server_fd);
+        return false;
+    }
+
+    if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {
+        fputs("proxy_handle_response(): failed to send response", stderr);
+        close(server_fd);
+        exit(EXIT_FAILURE);
+    }
+
+    close(server_fd);
+
+    return true;
 }
 
 /*
@@ -167,31 +311,61 @@ proxy_server_request() {
  * Exits on error.
  */
 static bool
-proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
+proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 {
     char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
+    char htmp, ptmp, *p = buf;
+    size_t n = len;
     struct uri uri;
+    struct iostring host, port;
+    int fd;
 
-    debug_http_request_line(reqline);
+    if (proxy->verbose)
+        debug_http_request_line(reqline);
 
-    if (!reqline.valid)
+    if (!reqline.valid) {
+        if (proxy->verbose)
+            fputs("malformed request (invalid request line)\n", stderr);
         return false;
-
-    len -= buf - reqline.end;
-    buf = reqline.end;
-
-    /*
-    for (struct http_header_field field = parse_http_header_field(buf, len);
-         buf != end && field.valid;
-         field = parse_http_header_field(buf, len)) {
-        debug_http_header_field(field);
-        len -= buf - field.end;
-        buf = field.end;
     }
-    */
-    (void)end;
 
+    n -= p - reqline.end;
+    p = reqline.end;
+
+    for (struct http_header_field field;
+         p < end && *p != '\r';
+         n -= p - field.end, p = field.end) {
+
+        field = parse_http_header_field(p, n);
+
+        if (!field.valid)
+            continue;
+
+        if (proxy->verbose)
+            debug_http_header_field(field);
+    }
+
+    // Skip over CRLF.
+    n -= 2;
+    p += 2;
+    if (p > end) {
+        if (proxy->verbose)
+            fputs("malformed request (too short)\n", stderr);
+        return false;
+    }
+
+    uri = parse_uri(reqline.request_target.p, reqline.request_target.len);
+
+    if (proxy->verbose)
+        debug_uri(uri);
+
+    if (!uri.valid) {
+        if (proxy->verbose)
+            fputs("malformed request (invalid URI)\n", stderr);
+        return false;
+    }
+    
     uri = parse_uri(reqline.request_target.p, reqline.request_target.len);
 
     debug_uri(uri);
@@ -199,11 +373,41 @@ proxy_handle_request(struct proxy *proxy, char *buf, size_t len)
     if (!uri.valid)
         return false;
 
-    // TODO: proxy HTTP traffic to the server specified in the Host header
-    // OPTIONAL: set socket options according to headers (keepalive, etc)?
-    proxy_server_request();
+    host = uri.authority.host;
+    port = uri.authority.port;
 
-    return true;
+    // Temporarily nul-terminate the host and port strings.
+    htmp = host.p[host.len];
+    host.p[host.len] = '\0';
+    ptmp = port.p[port.len];
+    if (ptmp != '\0') // The default port is already terminated (and const).
+        port.p[port.len] = '\0';
+
+    fd = connect_server(host.p, port.p);
+    if (fd == FAILURE) {
+        fputs("proxy_handle_request(): failed to connect to server\n", stderr);
+        exit(EXIT_FAILURE);
+    }
+
+    // Restore original values.
+    host.p[host.len] = htmp;
+    if (ptmp != '\0')
+        port.p[port.len] = ptmp;
+
+    if (send_request(fd, reqline, uri, len) == FAILURE) {
+        fputs("failed to send request\n", stderr);
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    len = recv_response(fd, buf, buflen);
+    if (len == FAILURE) {
+        fputs("failed to receive response\n", stderr);
+        close(fd);
+        exit(EXIT_FAILURE);
+    }
+
+    return proxy_handle_response(proxy, fd, buf, len);
 }
 
 /*
@@ -231,7 +435,7 @@ proxy_recv_request(struct proxy *proxy)
                    ntohs(proxy->client.sin_port));
         return false;
     default:
-        return proxy_handle_request(proxy, buf, len);
+        return proxy_handle_request(proxy, buf, len, sizeof buf);
     }
 }
 

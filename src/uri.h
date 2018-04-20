@@ -1,21 +1,22 @@
 #ifndef _uri_h_
-
 #define _uri_h_
 
 #include <stdbool.h>
 #include <stdlib.h>
 
+#include "iostring.h"
+
 struct uri {
-	struct {
-		char *p;
-		size_t len;
-	} scheme, host, port, path_query_fragment;
-	char *end;
-	bool valid;
+    struct iostring scheme, path_query_fragment;
+    struct {
+        struct iostring host, port;
+    } authority;
+    char *end;
+    bool valid;
 };
 
-struct uri parse_uri(char *buy, size_t len);
+struct uri parse_uri(char *buf, size_t len);
 
 void debug_uri(struct uri);
 
-#endif // _http_h_
+#endif // _uri_h_

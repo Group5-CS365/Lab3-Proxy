@@ -6,109 +6,104 @@
 struct uri
 parse_uri(char *buf, size_t len)
 {
-//	static char const * const crlf = "\r\n";
-//	static size_t const crlflen = 2;
-	static char const * const fslash = "/:";
-	static size_t const cl = 2;
+    static char const * const delims = "/:";
+    static size_t const delimslen = 2;
 
-	char *p = buf, *end = buf + len;
-	struct uri site = { .end = end };
+    char *p = buf, *end = buf + len;
+    struct uri site = { .end = end };
 
-	if (p == end) {
-		fputs("warning: invalid uri (empty)\n", stderr);
-		return site;
-	}
+    if (p == end) {
+        fputs("warning: invalid uri (empty)\n", stderr);
+        return site;
+    }
 
-	// Scheme
-	site.scheme.p = p;
-	p = memchr(p, ':', len);
-	site.scheme.len = p - site.scheme.p;
+    // Scheme
+    site.scheme.p = p;
+    p = memchr(p, ':', len);
+    site.scheme.len = p - site.scheme.p;
 
-	++p; // :
+    ++p; // :
 
-	// Eat Forward Slashes
-	while (p != end && memchr(fslash, *p, cl) != NULL)
-		++p;
-	len -= p - site.scheme.p;
+    // Eat Forward Slashes
+    while (p != end && memchr(delims, *p, delimslen) != NULL)
+        ++p;
+    len -= p - site.scheme.p;
 
-	if (p == end) {
-		fputs("warning: invalid uri (after scheme)\n", stderr);
-		fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
-		return site;
-	}
+    if (p == end) {
+        fputs("warning: invalid uri (after scheme)\n", stderr);
+        fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
+        return site;
+    }
 
-	// Host
-	site.host.p = p;
-	while (p != end && memchr(fslash, *p, cl) == NULL)
-		++p;
-	site.host.len = p - site.host.p;
+    // Host
+    site.authority.host.p = p;
+    while (p != end && memchr(delims, *p, delimslen) == NULL)
+        ++p;
+    site.authority.host.len = p - site.authority.host.p;
 
-	// Eat colon or forwardslash
-	while (p != end && memchr(fslash, *p, cl) != NULL)
-		++p;
-	len -= p - site.host.p;
+    if (p == end) {
+        fputs("warning: invalid uri (after host)\n", stderr);
+        fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
+        fprintf(stderr, "HOST: %.*s\n", (int)site.authority.host.len, site.authority.host.p);
+        return site;
+    }
 
-	if (p == end) {
-		fputs("warning: invalid uri (after host)\n", stderr);
-		fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
-		fprintf(stderr, "HOST: %.*s\n", (int)site.host.len, site.host.p);
-		return site;
-	}
-	++p;
-	
-	// Port
-	site.port.p = p;
-	while (p != end && memchr(fslash, *p, cl) == NULL)
-		++p;
-	site.port.len = p - site.port.p;
+    if (*p == ':') {
+        // :
+        if (++p == end || *p == '/') {
+            fputs("warning: invalid uri (empty port)\n", stderr);
+            fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
+            fprintf(stderr, "HOST: %.*s\n", (int)site.authority.host.len, site.authority.host.p);
+            return site;
+        }
 
-	// Eat colon or forwardslash
-	while (p != end && memchr(fslash, *p, cl) != NULL)
-		++p;
-	len -= p - site.port.p;
+        // Port
+        site.authority.port.p = p;
+        while (p != end && memchr(delims, *p, delimslen) == NULL)
+            ++p;
+        site.authority.port.len = p - site.authority.port.p;
 
-	if (p == end) {
-		fputs("warning: invalid uri (after port)\n", stderr);
-		fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
-		fprintf(stderr, "HOST: %.*s\n", (int)site.host.len, site.host.p);
-		fprintf(stderr, "PORT: %.*s\n", (int)site.port.len, site.port.p);
-		return site;
-	}
-	
-	// Path
-	site.path_query_fragment.p = p;
-	while (p != end)
-		++p;
-	site.path_query_fragment.len = p - site.path_query_fragment.p;
+        if (p == end) {
+            fputs("warning: invalid uri (after port)\n", stderr);
+            fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
+            fprintf(stderr, "HOST: %.*s\n", (int)site.authority.host.len, site.authority.host.p);
+            fprintf(stderr, "PORT: %.*s\n", (int)site.authority.port.len, site.authority.port.p);
+            return site;
+        }
+    }
+    else {
+        site.authority.port.p = (char *)"80"; // FIXME: not ideal...
+        site.authority.port.len = 2;
+    }
 
-	if (p == end) {
-		fputs("warning: invalid uri (after port)\n", stderr);
-                fprintf(stderr, "SCHEME: %.*s\n", (int)site.scheme.len, site.scheme.p);
-                fprintf(stderr, "HOST: %.*s\n", (int)site.host.len, site.host.p);
-                fprintf(stderr, "PORT: %.*s\n", (int)site.port.len, site.port.p);
-		fprintf(stderr, "PATH QUERY FRAGMENT: %.*s\n", (int)site.path_query_fragment.len, site.path_query_fragment.p);
-		return site;
-	}
+    if (*p == '/') {
+        // Path
+        site.path_query_fragment.p = p;
+        site.path_query_fragment.len = end - p;
+		}
+    else {
+        site.path_query_fragment.p = (char *)"/"; // FIXME: not ideal...
+        site.path_query_fragment.len = 1;
+    }
 
-	site.valid = true;
-	site.end = p + 1;
+    site.valid = true;
 
-	return site;
+    return site;
 }
 
 void
-debug_uri(struct uri reqhead)
+debug_uri(struct uri uri)
 {
-	if (reqhead.valid)
-		printf("valid URI:\n"
-			"\tSCHEME: %.*s\n"
-			"\tHOST: %.*s\n"
-			"\tPORT: %.*s\n"
-			"\tPATH QUERY FRAGMENT: %.*s\n",
-			(int)reqhead.scheme.len, reqhead.scheme.p,
-			(int)reqhead.host.len, reqhead.host.p,
-			(int)reqhead.port.len, reqhead.port.p,
-			(int)reqhead.path_query_fragment.len, reqhead.path_query_fragment.p);
-	else
-		printf("not a valid URI\n");
+    if (uri.valid)
+        printf("valid URI:\n"
+               "\tSCHEME: %.*s\n"
+               "\tHOST: %.*s\n"
+               "\tPORT: %.*s\n"
+               "\tPATH QUERY FRAGMENT: %.*s\n",
+               (int)uri.scheme.len, uri.scheme.p,
+               (int)uri.authority.host.len, uri.authority.host.p,
+               (int)uri.authority.port.len, uri.authority.port.p,
+               (int)uri.path_query_fragment.len, uri.path_query_fragment.p);
+    else
+        puts("not a valid URI");
 }

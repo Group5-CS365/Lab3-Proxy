@@ -107,7 +107,117 @@ debug_http_request_line(struct http_request_line reqline)
                (int)reqline.request_target.len, reqline.request_target.p,
                (int)reqline.http_version.len, reqline.http_version.p);
     else
-        printf("not a valid HTTP request line\n");
+        puts("not a valid HTTP request line");
+}
+
+struct http_status_line
+parse_http_status_line(char *buf, size_t len)
+{
+    static char const * const crlf = "\r\n";
+    static size_t const crlflen = 2;
+    static char const * const ws = " \t\r\v\f";
+    static size_t const wslen = 5;
+
+    char *p = buf, *end = buf + len;
+    struct http_status_line line = { .end = end };
+
+    /************************ NOT SURE IF THIS IS NEEDED *********************/
+    // Consume leading CRLFs.
+    // https://tools.ietf.org/html/rfc7230#section-3.5
+    while (p != end && memchr(crlf, *p, crlflen) != NULL)
+        ++p;
+    len -= p - buf;
+
+    if (p == end) {
+        fputs("warning: invalid response line (empty)\n", stderr);
+        return line;
+    }
+    /********************************** END *********************************/
+
+    // HTTP version
+    line.http_version.p = p;
+    while (p != end && memchr(ws, *p, wslen) == NULL)
+        ++p;
+    line.http_version.len = p - line.http_version.p;
+
+    // Consume whitespace.
+    while (p != end && memchr(ws, *p, wslen) != NULL)
+        ++p;
+    len -= p - line.http_version.p;
+
+    if (p == end) {
+        fputs("warning: invalid status line (after http version)\n", stderr);
+        fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
+        return line;
+    }
+
+    // Status code
+    line.status_code.p = p;
+    while (p != end && memchr(ws, *p, wslen) == NULL)
+        ++p;
+    line.status_code.len = p - line.status_code.p;
+
+    // Consume whitespace.
+    while (p != end && memchr(ws, *p, wslen) != NULL)
+        ++p;
+    len -= p - line.status_code.p;
+
+    if (p == end) {
+        fputs("warning: invalid status line (after status code)\n", stderr);
+        fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
+        fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
+        return line;
+    }
+
+    // Reason phrase
+    line.reason_phrase.p = p;
+    p = memchr(p, '\r', len);
+    line.reason_phrase.len = p - line.reason_phrase.p;
+
+    if (p != NULL) {
+        ++p; // CR
+        len -= p - line.reason_phrase.p;
+    }
+
+    if (p == end || p == NULL) {
+        fputs("warning: invalid status line (after reason phrase)\n", stderr);
+        fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
+        fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
+        fprintf(stderr, "REASON PHRASE: %.*s\n", (int)line.reason_phrase.len, line.reason_phrase.p);
+        return line;
+    }
+
+    /************************ NOT SURE IF THIS IS NEEDED *********************/
+    // LF (already consumed CR)
+    if (*p != '\n') {
+        fputs("warning: invalid response line (missing LF)\n", stderr);
+        fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
+        fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
+        fprintf(stderr, "REASON PHRASE: %.*s\n", (int)line.reason_phrase.len, line.reason_phrase.p);
+        fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
+        return line;
+    }
+    /********************************** END *********************************/
+
+    line.valid = true;
+    line.end = p + 1;
+
+    return line;
+}
+
+void
+debug_http_status_line(struct http_status_line statline)
+{
+    if (statline.valid)
+        printf("valid HTTP status line:\n"
+               "\tHTTP VERSION: %.*s\n"
+               "\tSTATUS CODE: %.*s\n"
+               "\tREASON PHRASE: %.*s\n",
+               (int)statline.http_version.len, statline.http_version.p,
+               (int)statline.status_code.len, statline.status_code.p,
+               (int)statline.reason_phrase.len, statline.reason_phrase.p);
+    else
+        puts("not a valid HTTP status line");
 }
 
 struct http_header_field
@@ -129,16 +239,23 @@ parse_http_header_field(char *buf, size_t len)
     // Field name
     head.field_name.p = p;
     p = memchr(p, ':', len);
+    if (p == NULL) {
+        fputs("warning: invalid header field\n", stderr);
+        head.valid = false;
+        return head;
+    }
     head.field_name.len = p - head.field_name.p;
 
-    ++p; // :
+    if (p != NULL) {
+        ++p; // :
 
-    // Eat white space.
-    while (p != end && memchr(ws, *p, wslen) != NULL)
-        ++p;
-    len -= p - head.field_name.p;
+        // Eat white space.
+        while (p < end && memchr(ws, *p, wslen) != NULL)
+            ++p;
+        len -= p - head.field_name.p;
+    }
 
-    if (p == end) {
+    if (p == end || p == NULL) {
         fputs("warning: invalid header field (after field name)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         return head;
@@ -186,5 +303,5 @@ debug_http_header_field(struct http_header_field reqhead)
                (int)reqhead.field_name.len, reqhead.field_name.p,
                (int)reqhead.field_value.len, reqhead.field_value.p);
     else
-        printf("not a valid HTTP header field\n");
+        puts("not a valid HTTP header field");
 }
