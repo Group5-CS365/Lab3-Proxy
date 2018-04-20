@@ -239,10 +239,10 @@ parse_http_header_field(char *buf, size_t len)
     // Field name
     head.field_name.p = p;
     p = memchr(p, ':', len);
-    if(p == NULL) {
-      fputs("warning: invalid header field\n", stderr);
-      head.valid = false;
-      return head;
+    if (p == NULL) {
+        fputs("warning: invalid header field\n", stderr);
+        head.valid = false;
+        return head;
     }
     head.field_name.len = p - head.field_name.p;
 

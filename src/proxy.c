@@ -266,15 +266,17 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
     n -= p - statline.end;
     p = statline.end;
 
-    for (struct http_header_field field = parse_http_header_field(p, n);
-         p < end && *p != '\r' && field.valid;
-         field = parse_http_header_field(p, n)) {
+    for (struct http_header_field field;
+         p < end && *p != '\r';
+         n -= p - field.end, p = field.end) {
+
+        field = parse_http_header_field(p, n);
+
+        if (!field.valid)
+            continue;
 
         if (proxy->verbose)
             debug_http_header_field(field);
-
-        n -= p - field.end;
-        p = field.end;
     }
 
     // Skip over CRLF.
@@ -327,15 +329,17 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     n -= p - reqline.end;
     p = reqline.end;
 
-    for (struct http_header_field field = parse_http_header_field(p, n);
-         p < end && *p != '\r' && field.valid;
-         field = parse_http_header_field(p, n)) {
+    for (struct http_header_field field;
+         p < end && *p != '\r';
+         n -= p - field.end, p = field.end) {
+
+        field = parse_http_header_field(p, n);
+
+        if (!field.valid)
+            continue;
 
         if (proxy->verbose)
             debug_http_header_field(field);
-
-        n -= p - field.end;
-        p = field.end;
     }
 
     // Skip over CRLF.
