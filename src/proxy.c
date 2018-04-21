@@ -107,7 +107,7 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
         return FAILURE;
     }
 
-    if (proxy->verbose)
+    if (verbose)
         printf("listening on port %d\n", port);
 
     proxy->sockfd = fd;
