@@ -22,8 +22,7 @@ base_body() {
 
 atf_test_case request1
 request1_head() {
-    base_head "The proxy removes the Proxy-Connection header from" \
-              "the request"
+    base_head "The proxy removes the Proxy-Connection header"
 }
 request1_body() {
     echo -e "GET http://${SERVER}/ HTTP/1.1\r
@@ -46,8 +45,7 @@ Accept: */*\r
 
 atf_test_case request2
 request2_head() {
-    base_head "The proxy requests the correct path+query+fragment" \
-              "from the server"
+    base_head "The proxy requests the correct path+query+fragment"
 }
 request2_body() {
     local path query fragment
