@@ -1,0 +1,41 @@
+#! /usr/bin/env atf-sh
+
+SERVER_HOST=localhost
+SERVER_PORT=13322
+SERVER=${SERVER_HOST}:${SERVER_PORT}
+
+PROXY_HOST=localhost
+PROXY_PORT=14433
+
+atf_test_case reuse_address
+reuse_address_head() {
+    atf_set "require.progs" "grep nc proxy wc"
+    atf_set "descr" "The proxy reuses a previously bound address"
+}
+reuse_address_body() {
+    local request
+
+    # Does it matter if this is an incomplete request?
+    request="GET http://${SERVER}/ HTTP/1.1\r\n"
+
+    nc -l ${SERVER_PORT} &
+
+    proxy -v ${PROXY_PORT} > test.out &
+    echo -e "${request}" | nc ${PROXY_HOST} ${PROXY_PORT}
+
+    kill %2 && wait %2
+
+    proxy -v ${PROXY_PORT} >> test.out &
+    echo -e "${request}" | nc ${PROXY_HOST} ${PROXY_PORT}
+
+    atf_check_equal 2 $(grep ${PROXY_PORT} test.out | wc -l)
+}
+
+atf_init_test_cases() {
+    atf_add_test_case reuse_address
+}
+
+# Local Variables:
+# mode: sh
+# End:
+# vim: filetype=sh fileformat=unix

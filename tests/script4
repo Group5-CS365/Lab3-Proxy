@@ -1,0 +1,40 @@
+#! /bin/sh
+
+
+#	Proxy listens on diffrent port all gud
+
+
+# use this in vim if not working ->    :set fileformat=unix
+
+SERVER_PORT=12345
+PROXY_PORT=23213  # modified
+
+echo -e "GET http://localhost:${SERVER_PORT}/ HTTP/1.1\r
+Host: localhost:${SERVER_PORT}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+" > test.in
+
+echo -e "GET / HTTP/1.1\r
+Host: localhost:${SERVER_PORT}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+" > test.ok
+
+echo "Running server"
+nc -l ${SERVER_PORT} > tmp.out &
+
+echo "Running proxy"
+proxy -v ${PROXY_PORT} &
+
+echo "Running client"
+nc localhost ${PROXY_PORT} < test.in
+
+# cleanup
+kill %1
+kill %2
+
+diff -u tmp.out test.ok
