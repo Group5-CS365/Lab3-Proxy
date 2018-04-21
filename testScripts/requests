@@ -9,7 +9,7 @@ PROXY_PORT=5432
 PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 base_head() {
-    atf_set "require.progs" "nc proxy"
+    atf_set "require.progs" "diff nc proxy"
     atf_set "descr" ${1:-"A given request produces the expected" \
                          "request at the server when proxied"}
 }

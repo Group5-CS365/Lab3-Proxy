@@ -2,7 +2,7 @@
 
 atf_test_case hflag
 hflag_head() {
-    atf_set "require.progs" proxy
+    atf_set "require.progs" "proxy"
     atf_set "descr" "The -h flag shows a help message"
 }
 hflag_body() {
