@@ -21,9 +21,10 @@ Then you can run the proxy from the current directory
 Testing
 -------
 
-Running the test suite requires [Kyua][kyua] and [ATF][atf] to be installed.
-[kyua]: https://github.com/jmmv/kyua
-[atf]: https://github.com/jmmv/atf
+Running the test suite requires [Kyua][] and [ATF][] to be installed.
+
+[Kyua]: https://github.com/jmmv/kyua
+[ATF]: https://github.com/jmmv/atf
 
 Kyua is a testing framework for infrastructure software. It supports running
 test case written with the ATF libraries.
