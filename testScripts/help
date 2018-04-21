@@ -3,8 +3,7 @@
 atf_test_case hflag
 hflag_head() {
     atf_set "require.progs" proxy
-    atf_set "descr" "Tests that the -h flag works correctly to show" \
-                    "a help message"
+    atf_set "descr" "The -h flag shows a help message"
 }
 hflag_body() {
     atf_check -o match:usage proxy -h

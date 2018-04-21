@@ -1,32 +1,33 @@
 #! /usr/bin/env atf-sh
 
+SERVER_HOST=localhost
 SERVER_PORT=2345
-PROXY_PORT=5432
+SERVER=${SERVER_HOST}:${SERVER_PORT}
 
+PROXY_HOST=localhost
+PROXY_PORT=5432
+PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 base_head() {
     atf_set "require.progs" "nc proxy"
-    atf_set "descr" "Tests a given request produces the expected" \
-            "request at the server when proxied"
+    atf_set "descr" ${1:-"A given request produces the expected" \
+                         "request at the server when proxied"}
 }
 base_body() {
-    local request proxied
-    request=${1:-test.in}
-    proxied=${2:-test.ok}
-    atf_check -o file:${proxied} nc -l ${SERVER_PORT} &
+    nc -l ${SERVER_PORT} > test.out &
     proxy -v ${PROXY_PORT} &
-    nc localhost ${PROXY_PORT} < ${request}
-    kill %1
-    kill %2
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in
+    diff -u test.ok test.out
 }
 
 atf_test_case request1
 request1_head() {
-    base_head
+    base_head "The proxy removes the Proxy-Connection header from" \
+              "the request"
 }
 request1_body() {
-    echo -e "GET http://localhost:${SERVER_PORT}/ HTTP/1.1\r
-Host: localhost:${SERVER_PORT}\r
+    echo -e "GET http://${SERVER}/ HTTP/1.1\r
+Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 Proxy-Connection: Keep-Alive\r
@@ -34,7 +35,7 @@ Proxy-Connection: Keep-Alive\r
 " > test.in
 
     echo -e "GET / HTTP/1.1\r
-Host: localhost:${SERVER_PORT}\r
+Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
@@ -45,19 +46,24 @@ Accept: */*\r
 
 atf_test_case request2
 request2_head() {
-    base_head
+    base_head "The proxy requests the correct path+query+fragment" \
+              "from the server"
 }
 request2_body() {
-    echo -e "GET http://localhost:${SERVER_PORT}/hello HTTP/1.1\r
-Host: localhost:${SERVER_PORT}\r
+    local path query fragment
+    path="/hello"
+    query="?p=q&s=t;f"
+    fragment="#xyz"
+    echo -e "GET http://${SERVER}${path}${query}${fragment} HTTP/1.1\r
+Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 " > test.in
 
-    echo -e "GET /hello HTTP/1.1\r
-Host: localhost:${SERVER_PORT}\r
+    echo -e "GET ${path}${query}${fragment} HTTP/1.1\r
+Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
@@ -68,26 +74,17 @@ Accept: */*\r
 
 atf_test_case request3
 request3_head() {
-    base_head
+    base_head "The proxy rejects an empty path"
 }
 request3_body() {
-    echo -e "GET http://blue.cs.sonoma.edu/page_name.html HTTP/1.0\r
-Host: blue.cs.sonoma.edu:3333\r
-Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
-Accept-Encoding: gzip, bzip2\r
-Accept-Language: en\r
-User-Agent: Lynx/2.8.9dev.4 libwww-FM/2.14 SSL-MM/1.4.1 OpenSSL/1.0.1k-fips\r
+    echo -e "GET http://${SERVER} HTTP/1.0\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
 \r
 " > test.in
 
-    echo -e "GET /page_name.html HTTP/1.0\r
-Host: blue.cs.sonoma.edu:3333\r
-Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
-Accept-Encoding: gzip, bzip2\r
-Accept-Language: en\r
-User-Agent: Lynx/2.8.9dev.4 libwww-FM/2.14 SSL-MM/1.4.1 OpenSSL/1.0.1k-fips\r
-\r
-" > test.ok
+    echo -n > test.ok
 
     base_body
 }
