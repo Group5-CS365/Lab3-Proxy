@@ -35,7 +35,7 @@ through the Makefile.
 
 To manually run the tests, it is necessary to source the `.test-env` script in your shell.
 ```sh
-. .test-env
+. ./.test-env
 ```
 
 This adds the project root directory to the PATH environment variable, and on blue it adds
