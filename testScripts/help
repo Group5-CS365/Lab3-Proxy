@@ -13,3 +13,8 @@ hflag_body() {
 atf_init_test_cases() {
     atf_add_test_case hflag
 }
+
+# Local Variables:
+# mode: sh
+# End:
+# vim: filetype=sh fileformat=unix
