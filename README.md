@@ -68,5 +68,5 @@ kyua report --verbose
 
 To run a particular test case:
 ```sh
-kyua debug testScripts/requests:request1
+kyua debug tests/requests:request1
 ```
