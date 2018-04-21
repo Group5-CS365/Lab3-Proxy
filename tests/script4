@@ -33,8 +33,8 @@ proxy -v ${PROXY_PORT} &
 echo "Running client"
 nc localhost ${PROXY_PORT} < test.in
 
-# cleanup
-kill %1
-kill %2
+echo "Cleaning up"
+kill %1 && wait %1
+kill %2 && wait %2
 
 diff -u tmp.out test.ok
