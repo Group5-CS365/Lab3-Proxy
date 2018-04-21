@@ -9,10 +9,10 @@ PROXY_PORT=5432
 PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 dummy_request() {
-    echo -e "GET http://${SERVER}/ HTTP/1.0\r\nHost: ${SERVER}\r\n\r\n"
+    printf "GET http://${SERVER}/ HTTP/1.0\r\nHost: ${SERVER}\r\n\r\n"
 }
 base_head() {
-    atf_set "require.progs" "diff nc proxy"
+    atf_set "require.progs" "hexdump diff nc printf proxy"
     atf_set "descr" ${1:-"A given response produces the expected" \
                          "response at the server when proxied"}
 }
@@ -20,6 +20,12 @@ base_body() {
     nc -l ${SERVER_PORT} < test.in &
     proxy -v ${PROXY_PORT} &
     dummy_request | nc ${PROXY_HOST} ${PROXY_PORT} > test.out
+
+    echo "expected response:"
+    hexdump -C test.ok
+    echo "actual response:"
+    hexdump -C test.out
+
     diff -u test.ok test.out
 }
 
@@ -28,7 +34,7 @@ response1_head() {
     base_head "The proxy responds with the server's full response"
 }
 response1_body() {
-    echo -e "\
+    printf > test.in "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -42,7 +48,11 @@ Content-Type: text/html; charset=iso-8859-1\r
 <h1>Not Found</h1>
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
-" > test.in
+"
+    cp test.in test.ok
+
+    base_body
+}
 
     cp test.in test.ok
 
