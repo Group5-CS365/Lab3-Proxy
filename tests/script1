@@ -9,23 +9,25 @@
 SERVER_PORT=2345
 PROXY_PORT=5432
 
-echo -e "GET http://localhost:${SERVER_PORT}/ HTTP/1.1\r
+printf > test.in "\
+GET http://localhost:${SERVER_PORT}/ HTTP/1.1\r
 Host: localhost:${SERVER_PORT}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
-" > test.in
+"
 
-echo -e "GET / HTTP/1.1\r
+printf > test.ok "\
+GET / HTTP/1.1\r
 Host: localhost:${SERVER_PORT}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
-" > test.ok
+"
 
 echo "Running server"
-nc -l ${SERVER_PORT} > tmp.out &
+nc -l ${SERVER_PORT} > test.out &
 
 echo "Running proxy"
 proxy -v ${PROXY_PORT} &
@@ -38,4 +40,10 @@ kill %1 && wait %1
 kill %2 && wait %2
 
 echo "Results"
-diff -u test.ok tmp.out
+
+echo "expected request:"
+hexdump -C test.ok
+echo "actual request:"
+hexdump -C test.out
+
+diff -u test.ok test.out

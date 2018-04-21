@@ -9,7 +9,7 @@ PROXY_PORT=5432
 PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 base_head() {
-    atf_set "require.progs" "diff nc proxy"
+    atf_set "require.progs" "diff hexdump nc printf proxy"
     atf_set "descr" ${1:-"A given request produces the expected" \
                          "request at the server when proxied"}
 }
@@ -17,6 +17,12 @@ base_body() {
     nc -l ${SERVER_PORT} > test.out &
     proxy -v ${PROXY_PORT} &
     nc ${PROXY_HOST} ${PROXY_PORT} < test.in
+
+    echo "expected request:"
+    hexdump -C test.ok
+    echo "actual request:"
+    hexdump -C test.out
+
     diff -u test.ok test.out
 }
 
@@ -25,21 +31,21 @@ request1_head() {
     base_head "The proxy removes the Proxy-Connection header"
 }
 request1_body() {
-    echo -e "GET http://${SERVER}/ HTTP/1.1\r
+    printf > test.in "\
+GET http://${SERVER}/ HTTP/1.1\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
-" > test.in
-
-    echo -e "GET / HTTP/1.1\r
+"
+    printf > test.ok "\
+GET / HTTP/1.1\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
-" > test.ok
-
+"
     base_body
 }
 
@@ -52,21 +58,21 @@ request2_body() {
     path="/hello"
     query="?p=q&s=t;f"
     fragment="#xyz"
-    echo -e "GET http://${SERVER}${path}${query}${fragment} HTTP/1.1\r
+    printf > test.in "\
+GET http://${SERVER}${path}${query}${fragment} HTTP/1.1\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
-" > test.in
-
-    echo -e "GET ${path}${query}${fragment} HTTP/1.1\r
+"
+    printf > test.ok "\
+GET ${path}${query}${fragment} HTTP/1.1\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
-" > test.ok
-
+"
     base_body
 }
 
@@ -75,15 +81,14 @@ request3_head() {
     base_head "The proxy rejects an empty path"
 }
 request3_body() {
-    echo -e "GET http://${SERVER} HTTP/1.0\r
+    printf > test.in "\
+GET http://${SERVER} HTTP/1.0\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
-" > test.in
-
+"
     echo -n > test.ok
-
     base_body
 }
 

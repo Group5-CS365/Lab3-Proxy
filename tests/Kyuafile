@@ -6,6 +6,6 @@ atf_test_program{name="help"}
 atf_test_program{name="requests"}
 atf_test_program{name="responses"}
 atf_test_program{name="system"}
-plain_test_program{name="script1", required_programs="nc proxy"}
-plain_test_program{name="script3", required_programs="nc proxy"}
-plain_test_program{name="script4", required_programs="nc proxy"}
+plain_test_program{name="script1", required_programs="diff hexdump nc printf proxy"}
+plain_test_program{name="script3", required_programs="diff hexdump nc printf proxy"}
+plain_test_program{name="script4", required_programs="diff hexdump nc printf proxy"}
