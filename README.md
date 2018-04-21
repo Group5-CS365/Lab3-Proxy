@@ -48,7 +48,7 @@ First, source the `test-env` script in your shell. This adds the project root
 directory to the PATH environment variable, and on blue it adds the prefix for
 Kyua and ATF to the PATH as well.
 ```sh
-. test-env
+. ./test-env
 ```
 
 To list the available tests:
