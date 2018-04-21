@@ -174,35 +174,56 @@ connect_server(char *host, char *port)
  * Send the parts of the new HTTP request to the server.
  */
 static ssize_t
-send_request(int fd, struct http_request_line reqln, struct uri uri, size_t len)
+send_request(int fd,
+             struct http_request_line reqln,
+             struct uri uri,
+             struct http_header_field proxyconn,
+             size_t len)
 {
     // Request parts:
     // * Method
     // * Request path (minus proxy-to URI component)
-    // * The rest (SP+version & headers & body)
+    // > If we found a valid Proxy-Connection header:
+    // * SP + Version + CRLF & Headers before Proxy-Connection
+    // * Headers after Proxy-Connection & Body
+    // > Otherwise:
+    // * The rest (SP + Version + CRLF & Headers & Body)
     //
     // Using iovecs we can remove the URI from the request by skipping over it,
-    // while only needing to make one syscall.
-    // TODO: We also should be skipping the Proxy-Connection header somehow.
-    size_t version_offset = reqln.http_version.p - reqln.method.p - 1; // -1 for SP
-    size_t rest_len = len - version_offset;
-    struct iovec parts[] = {
+    // while only needing to make one syscall. Likewise for Proxy-Connection.
+    char * const version = reqln.http_version.p - 1; // -1 for SP
+    size_t const version_offset = version - reqln.method.p;
+    size_t const proxyconn_offset = proxyconn.field_name.p - version;
+    size_t const proxyconn_end_offset = proxyconn.end - reqln.method.p;
+    size_t const rest_len =
+        len - (proxyconn.valid ? proxyconn_end_offset : version_offset);
+    struct iovec const parts[] = {
         { // Method
             .iov_base = reqln.method.p,
             .iov_len = reqln.method.len + 1
         },
-        { // Request path
+        { // Request path (minus proxy-to URI component)
             .iov_base = uri.path_query_fragment.p,
             .iov_len = uri.path_query_fragment.len
         },
-        { // The rest
-            .iov_base = reqln.http_version.p - 1,
+        { // SP + Version + CRLF & Headers before Proxy-Connection OR The rest
+            .iov_base = version,
+            .iov_len = proxyconn.valid ? proxyconn_offset : rest_len
+        },
+        { // Headers after Proxy-Connection & Body
+            .iov_base = proxyconn.end,
             .iov_len = rest_len
         }
     };
+    size_t const num_parts =
+        sizeof parts / sizeof (struct iovec) - (proxyconn.valid ? 0 : 1);
+
+    for (int i = 0; i < num_parts; ++i)
+        printf("parts[%d] = { .iov_base = %p, .iov_len = %lu }\n",
+               i, parts[i].iov_base, parts[i].iov_len);
 
     // TODO: Error handling
-    return writev(fd, parts, sizeof parts / sizeof (struct iovec));
+    return writev(fd, parts, num_parts);
 }
 
 /*
@@ -315,6 +336,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 {
     char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
+    struct http_header_field proxyconn = { .valid = false };
     char htmp, ptmp, *p = buf;
     size_t n = len;
     struct uri uri;
@@ -344,6 +366,10 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
         if (proxy->verbose)
             debug_http_header_field(field);
+
+        if (strncasecmp("Proxy-Connection",
+                        field.field_name.p, field.field_name.len) == SUCCESS)
+            proxyconn = field;
     }
 
     // Skip over CRLF.
@@ -387,7 +413,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (ptmp != '\0')
         port.p[port.len] = ptmp;
 
-    if (send_request(fd, reqline, uri, len) == FAILURE) {
+    if (send_request(fd, reqline, uri, proxyconn, len) == FAILURE) {
         fputs("failed to send request\n", stderr);
         close(fd);
         exit(EXIT_FAILURE);
