@@ -92,10 +92,58 @@ Accept: */*\r
     base_body
 }
 
+atf_test_case request4
+request4_head() {
+    base_head "The proxy removes the Proxy-Connection header from middle"
+}
+request4_body() {
+    printf > test.in "\
+GET http://${SERVER}/ HTTP/1.1\r
+Host: ${SERVER}\r
+Proxy-Connection: Keep-Alive\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    printf > test.ok "\
+GET / HTTP/1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    base_body
+}
+
+atf_test_case request5
+request5_head() {
+    base_head "The proxy removes the Proxy-Connection header from first"
+}
+request5_body() {
+    printf > test.in "\
+GET http://${SERVER}/ HTTP/1.1\r
+Proxy-Connection: Keep-Alive\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    printf > test.ok "\
+GET / HTTP/1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    base_body
+}
+
 atf_init_test_cases() {
     atf_add_test_case request1
     atf_add_test_case request2
     atf_add_test_case request3
+    atf_add_test_case request4
+    atf_add_test_case request5
 }
 
 # Local Variables:
