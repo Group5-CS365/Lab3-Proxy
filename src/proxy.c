@@ -218,10 +218,6 @@ send_request(int fd,
     size_t const num_parts =
         sizeof parts / sizeof (struct iovec) - (proxyconn.valid ? 0 : 1);
 
-    for (int i = 0; i < num_parts; ++i)
-        printf("parts[%d] = { .iov_base = %p, .iov_len = %lu }\n",
-               i, parts[i].iov_base, parts[i].iov_len);
-
     // TODO: Error handling
     return writev(fd, parts, num_parts);
 }
