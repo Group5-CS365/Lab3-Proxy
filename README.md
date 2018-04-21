@@ -8,12 +8,12 @@ Usage
 -----
 
 To build the proxy, run
-```sh
+```
 make
 ```
 
 Then you can run the proxy from the current directory
-```sh
+```
 ./proxy -h
 ```
 
@@ -37,7 +37,7 @@ accessible prefix. This is automatically configured by the `test-env` script
 when running tests through the Makefile.
 
 To run the tests and display a summary of the results:
-```sh
+```
 make test
 ```
 
@@ -48,26 +48,26 @@ Advanced Testing
 First, source the `test-env` script in your shell. This adds the project root
 directory to the PATH environment variable, and on blue it adds the prefix for
 Kyua and ATF to the PATH as well.
-```sh
+```
 . ./test-env
 ```
 
 To list the available tests:
-```sh
+```
 kyua list
 ```
 
 To run all the test suites for the project:
-```sh
+```
 kyua test
 ```
 
 To view a detailed report of the last test results:
-```sh
+```
 kyua report --verbose
 ```
 
 To run a particular test case:
-```sh
+```
 kyua debug tests/requests:request1
 ```
