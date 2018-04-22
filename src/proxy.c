@@ -285,12 +285,12 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
     if (proxy->verbose)
         fprintf(stderr, "*** begin response ***\n%.*s\n*** end response ***\n", (int)len, buf);
 
-    n -= p - statline.end;
+    n -= statline.end - p;
     p = statline.end;
 
     for (struct http_header_field field;
          p < end && *p != '\r';
-         n -= p - field.end, p = field.end) {
+         n -= field.end - p, p = field.end) {
 
         field = parse_http_header_field(p, n);
 
@@ -365,12 +365,12 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         return false;
     }
 
-    n -= p - reqline.end;
+    n -= reqline.end - p;
     p = reqline.end;
 
     for (struct http_header_field field;
          p < end && *p != '\r';
-         n -= p - field.end, p = field.end) {
+         n -= field.end - p, p = field.end) {
 
         field = parse_http_header_field(p, n);
 
