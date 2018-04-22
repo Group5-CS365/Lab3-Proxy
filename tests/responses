@@ -13,8 +13,8 @@ dummy_request() {
 }
 base_head() {
     atf_set "require.progs" "hexdump diff nc printf proxy"
-    atf_set "descr" ${1:-"A given response produces the expected" \
-                         "response at the server when proxied"}
+    atf_set "descr" \
+            "${1:-A given response produces the expected response at the client}"
 }
 base_body() {
     nc -l ${SERVER_PORT} < test.in &
@@ -54,6 +54,51 @@ Content-Type: text/html; charset=iso-8859-1\r
     base_body
 }
 
+atf_test_case response2
+response2_head() {
+    base_head "The proxy handles Content-Length > INT_MAX responses"
+}
+response2_body() {
+    printf > test.in "\
+HTTP/1.1 404 Not Found\r
+Date: Sat, 21 Apr 2018 02:24:10 GMT\r
+Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
+Content-Length: 2147483648\r
+Content-Type: text/html; charset=iso-8859-1\r
+\r
+<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL /index.html was not found on this server.</p>
+</body></html>
+"
+    cp test.in test.ok
+
+    base_body
+}
+
+atf_test_case response3
+response3_head() {
+    base_head "The proxy handles Content-Length == INT_MAX responses"
+}
+response3_body() {
+    printf > test.in "\
+HTTP/1.1 404 Not Found\r
+Date: Sat, 21 Apr 2018 02:24:10 GMT\r
+Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
+Content-Length: 2147483647\r
+Content-Type: text/html; charset=iso-8859-1\r
+\r
+<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL /index.html was not found on this server.</p>
+</body></html>
+"
     cp test.in test.ok
 
     base_body
@@ -61,6 +106,8 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_init_test_cases() {
     atf_add_test_case response1
+    atf_add_test_case response2
+    atf_add_test_case response3
 }
 
 # Local Variables:
