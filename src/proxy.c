@@ -302,14 +302,12 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
 
         if (strncasecmp("Content-Length",
                         field.field_name.p, field.field_name.len) == SUCCESS) {
-            char const *s = field.field_value.p;
-            char *e = (char *)s + field.field_value.len;
-            long long l = strtoll(s, &e, 10);
+            unsigned long long l = strtoull(field.field_value.p, NULL, 10);
             // TODO: correct HTTP error response
-            if (0 > l || l > INT_MAX) {
+            if (l > INT_MAX) {
                 // FIXME: We should actually support larger content lengths.
                 // INT_MAX is the max size supported by splice().
-                fprintf(stderr, "Invalid Content-Length: %lld\n", l);
+                fprintf(stderr, "Invalid Content-Length: %llu\n", l);
                 close(server_fd);
                 return false;
             }
