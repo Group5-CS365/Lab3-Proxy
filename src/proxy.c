@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <err.h>
 #include <errno.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -269,7 +270,7 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
     char const * const end = buf + len;
     struct http_status_line statline = parse_http_status_line(buf, len);
     char *p = buf;
-    size_t n = len;
+    size_t n = len, more = 0;
 
     if (proxy->verbose)
         debug_http_status_line(statline);
@@ -298,6 +299,22 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
 
         if (proxy->verbose)
             debug_http_header_field(field);
+
+        if (strncasecmp("Content-Length",
+                        field.field_name.p, field.field_name.len) == SUCCESS) {
+            char const *s = field.field_value.p;
+            char *e = (char *)s + field.field_value.len;
+            long long l = strtoll(s, &e, 10);
+            // TODO: correct HTTP error response
+            if (0 > l || l > INT_MAX) {
+                // FIXME: We should actually support larger content lengths.
+                // INT_MAX is the max size supported by splice().
+                fprintf(stderr, "Invalid Content-Length: %lld\n", l);
+                close(server_fd);
+                return false;
+            }
+            more = (size_t)l;
+        }
     }
 
     // Skip over CRLF.
@@ -310,7 +327,7 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
         return false;
     }
 
-    if (send_response(server_fd, proxy->sockfd, buf, len, 0) == FAILURE) {
+    if (send_response(server_fd, proxy->sockfd, buf, len, more) == FAILURE) {
         fputs("proxy_handle_response(): failed to send response", stderr);
         close(server_fd);
         exit(EXIT_FAILURE);
