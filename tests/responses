@@ -11,7 +11,9 @@ PROXY=${PROXY_HOST}:${PROXY_PORT}
 dummy_request() {
     printf "GET http://${SERVER}/ HTTP/1.0\r\nHost: ${SERVER}\r\n\r\n"
 }
+
 base_head() {
+    atf_set "timeout" 1
     atf_set "require.progs" "hexdump diff nc printf proxy"
     atf_set "descr" \
             "${1:-A given response produces the expected response at the client}"
