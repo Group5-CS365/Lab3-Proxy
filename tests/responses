@@ -58,7 +58,7 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_test_case response2
 response2_head() {
-    base_head "The proxy handles Content-Length > INT_MAX responses"
+    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
 }
 response2_body() {
     printf > test.in "\
@@ -76,14 +76,14 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-    cp test.in test.ok
+    echo "TODO: 504 response" > test.ok
 
     base_body
 }
 
 atf_test_case response3
 response3_head() {
-    base_head "The proxy handles Content-Length == INT_MAX responses"
+    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
 }
 response3_body() {
     printf > test.in "\
@@ -101,7 +101,7 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-    cp test.in test.ok
+    echo "TODO: 504 response" > test.ok
 
     base_body
 }
