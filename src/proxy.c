@@ -325,6 +325,14 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
         return false;
     }
 
+    if (more < n) {
+        if (proxy->verbose)
+            fputs("malformed response (extra data)\n", stderr);
+        close(server_fd);
+        return false;
+    }
+
+    more -= n; // n is the amount of the body already in the buffer
     if (send_response(server_fd, proxy->sockfd, buf, len, more) == FAILURE) {
         fputs("proxy_handle_response(): failed to send response", stderr);
         close(server_fd);
