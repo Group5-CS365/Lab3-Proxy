@@ -1,3 +1,32 @@
+/*
+ * proxy.c
+ * The core of the proxy application.
+ */
+
+/*
+  MIT License
+
+  Copyright (c) 2018 Ryan Moeller, Tyler Gearing
+
+  Permission is hereby granted, free of charge, to any person obtaining a copy
+  of this software and associated documentation files (the "Software"), to deal
+  in the Software without restriction, including without limitation the rights
+  to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+  copies of the Software, and to permit persons to whom the Software is
+  furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included in all
+  copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+  AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+  LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+  SOFTWARE.
+*/
+
 #include "proxy.h"
 
 #include <sys/time.h>
@@ -32,9 +61,15 @@ enum { SUCCESS = 0, FAILURE = -1 };
 #define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
 
 #ifdef __linux__
+/*
+ * splice(2) is only available on Linux.
+ */
 #include <fcntl.h>
 #else
-#define BUFLEN 4096
+/*
+ * Everything else has to use this shim.
+ */
+#define BUFLEN 4096 // FIXME: what is a good value for this?
 static ssize_t
 splice(int fd_in, void *_off_in,
        int fd_out, void *_off_out,
@@ -61,6 +96,9 @@ splice(int fd_in, void *_off_in,
 }
 #endif
 
+/*
+ * The proxy context object contains data commonly used by proxy methods.
+ */
 struct proxy {
     int sockfd;
     bool verbose;
@@ -281,9 +319,6 @@ proxy_handle_response(struct proxy *proxy, int server_fd, char *buf, size_t len)
         close(server_fd);
         return false;
     }
-
-    if (proxy->verbose)
-        fprintf(stderr, "*** begin response ***\n%.*s\n*** end response ***\n", (int)len, buf);
 
     n -= statline.end - p;
     p = statline.end;
