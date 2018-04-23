@@ -138,12 +138,31 @@ Accept: */*\r
     base_body
 }
 
+atf_test_case request6
+request6_head() {
+    base_head "Rejects request when target URI not in absolute-form"
+}
+request6_body() {
+    printf > test.in "\
+GET / HTTP/1.1\r
+Proxy-Connection: Keep-Alive\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    echo "TODO: 400 response" > test.ok
+
+    base_body
+}
+
 atf_init_test_cases() {
     atf_add_test_case request1
     atf_add_test_case request2
     atf_add_test_case request3
     atf_add_test_case request4
     atf_add_test_case request5
+    atf_add_test_case request6
 }
 
 # Local Variables:

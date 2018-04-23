@@ -56,9 +56,12 @@ parse_uri(char *buf, size_t len)
     p = memchr(p, ':', len);
     site.scheme.len = p - site.scheme.p;
 
-    ++p; // :
+    if (p == NULL) {
+        fputs("warning: invalid uri (not an absolute-uri)\n", stderr);
+        return site;
+    }
 
-    // Eat Forward Slashes
+    // Eat ://
     while (p != end && memchr(delims, *p, delimslen) != NULL)
         ++p;
     len -= p - site.scheme.p;
@@ -106,7 +109,7 @@ parse_uri(char *buf, size_t len)
         }
     }
     else {
-        site.authority.port.p = (char *)"80"; // FIXME: not ideal...
+        site.authority.port.p = (char *)"80"; // XXX: not ideal...
         site.authority.port.len = 2;
     }
 
@@ -116,7 +119,7 @@ parse_uri(char *buf, size_t len)
         site.path_query_fragment.len = end - p;
 		}
     else {
-        site.path_query_fragment.p = (char *)"/"; // FIXME: not ideal...
+        site.path_query_fragment.p = (char *)"/"; // XXX: not ideal...
         site.path_query_fragment.len = 1;
     }
 
