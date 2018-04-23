@@ -595,8 +595,21 @@ proxy_select(struct proxy *proxy)
 static void
 ward_off_zombies()
 {
-    while (waitpid(0, NULL, WNOHANG) > 0)
-        ; // TODO: error handling?
+    int status = 0;
+
+    while (waitpid(0, &status, WNOHANG) > 0) {
+        if (WIFSIGNALED(status)) {
+            // TODO: More error checks!
+            switch (WTERMSIG(status)) {
+            case SIGSEGV:
+                fputs("child segfaulted\n", stderr);
+                break;
+            default:
+                fputs("child terminated\n", stderr);
+                break;
+            }
+        }
+    }
 }
 
 /*
