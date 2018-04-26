@@ -33,7 +33,7 @@ ATF is an Automated Testing Framework. It consists of C/C++/sh libraries for
 writing test programs.
 
 On the SSU blue server, Kyua and ATF are made available through a publicly
-accessible prefix. This is automatically configured by the `test-env` script
+accessible prefix. This is automatically configured by the `_test-env` script
 when running tests through the Makefile.
 
 To run the tests and display a summary of the results:
@@ -45,11 +45,11 @@ make test
 Advanced Testing
 ----------------
 
-First, source the `test-env` script in your shell. This adds the project root
+First, source the `_test-env` script in your shell. This adds the project root
 directory to the PATH environment variable, and on blue it adds the prefix for
 Kyua and ATF to the PATH as well.
 ```
-. ./test-env
+. ./_test-env
 ```
 
 To list the available tests:

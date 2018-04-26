@@ -14,7 +14,7 @@ proxy: $(objs)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^
 
 test: proxy
-	. ./test-env && kyua test
+	. ./_test-env && kyua test
 
 clean:
 	rm -rf $(objs) proxy
