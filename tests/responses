@@ -104,10 +104,53 @@ Content-Type: text/html; charset=iso-8859-1\r
     base_body
 }
 
+atf_test_case response4
+response4_head() {
+    atf_set "timeout" 5
+    atf_set "require.progs" "hexdump diff nc printf proxy sed"
+    atf_set "descr" "Large content"
+}
+response4_body() {
+    local server path
+
+    server="blue.cs.sonoma.edu"
+    path="/~rmoeller/FreeBSD-11.1-RELEASE-amd64-dvd1.iso"
+
+    if [ $(hostname)x != ${server}x ]
+    then
+        atf_skip "3GB file takes a while to download..."
+    fi
+
+    printf > test.in "\
+GET http://${server}${path} HTTP/1.0\r
+Host: ${server}\r
+Accept: */*\r
+\r
+"
+    proxy -v ${PROXY_PORT} &
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in > test.out
+
+    # NOTE: Netcat gives us the full data sent by the proxy,
+    # including the HTTP protocol data.
+    # We want to check only the size of the content (headers could vary),
+    # so we have to determine the length of the extra HTTP protocol data.
+
+    # Copy the HTTP status line and headers from the beginning of the output.
+    # Quits copying after the CRLF separating the headers from the body.
+    sed '/^\r$/q' test.out > http.out
+
+    full_len=$(stat -c "%s" test.out)
+    http_len=$(stat -c "%s" http.out)
+    content_len=$((full_len - http_len))
+
+    atf_check_equal 3348465664 ${content_len}
+}
+
 atf_init_test_cases() {
     atf_add_test_case response1
     atf_add_test_case response2
     atf_add_test_case response3
+    atf_add_test_case response4
 }
 
 # Local Variables:

@@ -277,7 +277,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 {
     bool const verbose = proxy->verbose;
 
-    ssize_t res;
+    ssize_t n, res, remaining = more;
 
     res = write(proxy->client_fd, buf, len);
     if (res == FAILURE) {
@@ -287,14 +287,72 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
     }
 
     if (more) {
-        res = splice(proxy->server_fd, NULL,
-                     proxy->client_fd, NULL,
-                     more, 0);
-        if (res == FAILURE) {
+        // splice(2) uses a pipe as an in-kernel "buffer" for zero-copy
+        // transfer between sockets.
+        // http://yarchive.net/comp/linux/splice.html
+        int pipefd[2];
+
+        if (pipe(pipefd) == FAILURE) {
             if (verbose)
-                perror("send_response: failed to splice response data");
+                perror("send_response: failed to create a pipe");
             return FAILURE;
         }
+
+        while (remaining > 0) {
+            // Move a chunk of data from the server socket to the pipe.
+            // We want to read as much as possible without blocking.
+            // NB: INT_MAX is the maximum size allowed by splice(2).
+            res = splice(proxy->server_fd, NULL,
+                         pipefd[1], NULL,
+                         INT_MAX, SPLICE_F_NONBLOCK);
+            if (res == 0) {
+                // XXX: should we retry?
+                if (verbose)
+                    fprintf(stderr,
+                            "send_response: expected %lu more bytes, found 0",
+                            remaining);
+                res = FAILURE;
+                break;
+            }
+            if (res == FAILURE) {
+                // TODO: Check for EAGAIN to retry?
+                perror("send_response: failed to splice from socket");
+                break;
+            }
+
+            n = res;
+
+            // Move a chunk of data from the pipe to the client socket.
+            // We won't necessarily get to write the full chunk in one go,
+            // so this loops until the pipe has been completely drained.
+            do {
+                ssize_t const res1 = splice(pipefd[0], NULL,
+                                            proxy->client_fd, NULL,
+                                            n, 0);
+                if (res1 == 0)
+                    // XXX: should we retry?
+                    break;
+                if (res1 == FAILURE) {
+                    // TODO: Check for EAGAIN to retry?
+                    perror("send_response: failed to splice to socket");
+                    res = FAILURE;
+                    break;
+                }
+
+                n -= res1;
+            } while (n);
+
+            if (res == FAILURE)
+                break; // The inner loop failed, break out of the outer loop.
+
+            remaining -= res;
+        }
+
+        close(pipefd[0]);
+        close(pipefd[1]);
+
+        if (res == FAILURE)
+            return FAILURE;
     }
 
     return len + more;
@@ -343,17 +401,8 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
 
         if (strncasecmp("Content-Length",
                         field.field_name.p, field.field_name.len) == SUCCESS) {
-            unsigned long long l = strtoull(field.field_value.p, NULL, 10);
-            // TODO: correct HTTP error response
-            if (l > INT_MAX) {
-                // FIXME: We should actually support larger content lengths.
-                // INT_MAX is the max size supported by splice().
-                if (verbose)
-                    fprintf(stderr, "Invalid Content-Length: %llu\n", l);
-                return FAILURE;
-            }
-            content_length = l;
-            more = (size_t)l;
+            content_length = strtoll(field.field_value.p, NULL, 10);
+            // TODO: error check, correct HTTP error response
         }
     }
 
@@ -366,15 +415,17 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
         return FAILURE;
     }
 
-    if (more < n) {
+    if (content_length < n) {
         if (verbose)
             fputs("malformed response (extra data)\n", stderr);
         return FAILURE;
     }
 
-    more -= n; // n is the amount of the body already in the buffer
+    // n is the amount of the body already in the buffer.
+    more = content_length - n;
+
     if (proxy_send_response(proxy, buf, len, more) == FAILURE) {
-        fputs("proxy_handle_response(): failed to send response", stderr);
+        fputs("proxy_handle_response(): failed to send response\n", stderr);
         // If we can't send a response, there's nothing more we can do.
         proxy_cleanup(proxy);
         exit(EXIT_FAILURE);
