@@ -81,11 +81,11 @@ unless running on blue.
 
 To enable the extended tests when not running on blue, invoke Kyua as
 ```
-kyua -v test_suites.basic.skip_extended_tests=no ...
+kyua -v test_suites.basic.skip_extended_tests=no test
 ```
 Conversely, to disable the extended tests when running on blue, invoke Kyua as
 ```
-kyua -v test_suites.basic.skip_extended_tests=yes ...
+kyua -v test_suites.basic.skip_extended_tests=yes test
 ```
 
 The variable can also be configured in your `kyua.conf`. See the documentation
