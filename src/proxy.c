@@ -556,13 +556,12 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         if (strncasecmp("Proxy-Connection",
                         field.field_name.p, field.field_name.len) == SUCCESS)
             proxyconn = field;
-        }
     }
 
     // Skip over CRLF.
     n -= 2;
     p += 2;
-// TODO: Develop test to trigger this error
+    // TODO: Develop test to trigger this error
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
