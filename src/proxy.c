@@ -85,6 +85,26 @@ struct http_error errors[] = {
 		{ "Bad Request - ", 14 },
 		{ "The client request is invalid", 29 }
 	},
+	{
+		{ "500: ", 5 },
+		{ "Internal Server Error - ", 24 },
+		{ "The proxy encountered an unexpected condition", 45 }
+	},
+	{
+		{ "501: ", 5 },
+		{ "Not Implemented - ", 18 },
+		{ "The proxy does not recognize the request method", 47 }
+	},
+	{
+		{ "502: ", 5 },
+		{ "Bad Gateway - ", 14 },
+		{ "The response from the server is invalid", 39 }
+	},
+	{
+		{ "504: ", 5 },
+		{ "Gateway Timeout - ", 18 },
+		{ "The server response took too long", 33 }
+	}
 };
 
 /*
@@ -201,6 +221,10 @@ connect_server(char *host, char *port)
 static ssize_t
 send_error(struct proxy *proxy, enum http_status_code status) {
     struct iovec parts[] = {
+        { // Version
+            .iov_base = "HTTP/1.1 ",
+            .iov_len = 9
+        },
         { // Status
             .iov_base = errors[status].status.p,
             .iov_len = errors[status].status.len
@@ -417,7 +441,6 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
  */
 static ssize_t
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
-// TODO: error responses
 {
     char const * const end = buf + len;
     ssize_t content_length = 0;
@@ -432,6 +455,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (!statline.valid) {
         if (verbose)
             fputs("malformed response (invalid status line)\n", stderr);
+		send_error(proxy, BAD_GATEWAY); 
         return FAILURE;
     }
 
@@ -453,7 +477,6 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
         if (strncasecmp("Content-Length",
                         field.field_name.p, field.field_name.len) == SUCCESS) {
             content_length = strtoll(field.field_value.p, NULL, 10);
-            // TODO: error check, correct HTTP error response
         }
     }
 
@@ -463,12 +486,14 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (p > end) {
         if (verbose)
             fputs("malformed response (too short)\n", stderr);
+		send_error(proxy, BAD_GATEWAY); 
         return FAILURE;
     }
 
     if (content_length < n) {
         if (verbose)
             fputs("malformed response (extra data)\n", stderr);
+		send_error(proxy, BAD_GATEWAY); 
         return FAILURE;
     }
 
@@ -478,6 +503,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (proxy_send_response(proxy, buf, len, more) == FAILURE) {
         fputs("proxy_handle_response(): failed to send response\n", stderr);
         // If we can't send a response, there's nothing more we can do.
+		send_error(proxy, INTERNAL_ERROR); 
         proxy_cleanup(proxy);
         exit(EXIT_FAILURE);
     }
@@ -491,7 +517,6 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
  */
 static ssize_t
 proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
-// TODO: error responses
 {
     bool const verbose = proxy->verbose;
     char const * const end = buf + len;
@@ -531,12 +556,13 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         if (strncasecmp("Proxy-Connection",
                         field.field_name.p, field.field_name.len) == SUCCESS)
             proxyconn = field;
+        }
     }
 
     // Skip over CRLF.
     n -= 2;
     p += 2;
-	// TODO: Develop test to trigger this error
+// TODO: Develop test to trigger this error
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
@@ -569,6 +595,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     fd = connect_server(host.p, port.p);
     if (fd == FAILURE) {
         fputs("proxy_handle_request(): failed to connect to server\n", stderr);
+		send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 
@@ -586,6 +613,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
                      len) == FAILURE) {
         if (verbose)
             perror("failed to send request");
+		send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 

@@ -123,9 +123,8 @@ void debug_http_header_field(struct http_header_field);
  * Status Code
  */
 
-enum http_status_code { BAD_REQUEST, UNAUTHORIZED, FORBIDDEN,
-						NOT_FOUND, INTERNAL_ERROR, NOT_IMPLEMENTED,
-						BAD_GATEWAY, UNAVAILABLE };
+enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, NOT_IMPLEMENTED,
+						BAD_GATEWAY, TIMEOUT };
 
 /*
  * Error 
