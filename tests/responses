@@ -106,17 +106,28 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_test_case response4
 response4_head() {
-    atf_set "timeout" 5
-    atf_set "require.progs" "hexdump diff nc printf proxy sed"
+    atf_set "timeout" 60
+    atf_set "require.progs" "hexdump diff nc printf proxy sed stat"
     atf_set "descr" "Large content"
 }
 response4_body() {
-    local server path
+    local server path skip full_len http_len content_len
 
     server="blue.cs.sonoma.edu"
     path="/~rmoeller/FreeBSD-11.1-RELEASE-amd64-dvd1.iso"
 
-    if [ $(hostname)x != ${server}x ]
+    # NOTE: This test is skipped by default if not running on blue.
+    # To enable the extended tests manually, pass invoke Kyua as
+    # `kyua -v test_suites.basic.skip_extended_tests=no ...`
+    # Conversely, to manually disable the extended tests on blue, invoke Kyua as
+    # `kyua -v test_suites.basic.skip_extended_tests=yes ...`
+    if [ $(hostname)x = ${server}x ]
+    then
+        skip="no"
+    else
+        skip="yes"
+    fi
+    if [ $(atf_config_get "skip_extended_tests" ${skip})x != "no"x ]
     then
         atf_skip "3GB file takes a while to download..."
     fi
@@ -137,10 +148,16 @@ Accept: */*\r
 
     # Copy the HTTP status line and headers from the beginning of the output.
     # Quits copying after the CRLF separating the headers from the body.
-    sed '/^\r$/q' test.out > http.out
+    sed $'/^\r$/q' test.out > http.out
 
-    full_len=$(stat -c "%s" test.out)
-    http_len=$(stat -c "%s" http.out)
+    if [ $(uname -s)x = "Linux"x ]
+    then
+        full_len=$(stat -c "%s" test.out)
+        http_len=$(stat -c "%s" http.out)
+    else
+        full_len=$(stat -f "%z" test.out)
+        http_len=$(stat -f "%z" http.out)
+    fi
     content_len=$((full_len - http_len))
 
     atf_check_equal 3348465664 ${content_len}

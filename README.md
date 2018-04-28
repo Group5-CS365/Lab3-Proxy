@@ -71,3 +71,22 @@ To run a particular test case:
 ```
 kyua debug tests/requests:request1
 ```
+
+
+Extended Tests
+--------------
+
+Tests that require significant time or space to complete are disabled by default
+unless running on blue.
+
+To enable the extended tests when not running on blue, invoke Kyua as
+```
+kyua -v test_suites.basic.skip_extended_tests=no ...
+```
+Conversely, to disable the extended tests when running on blue, invoke Kyua as
+```
+kyua -v test_suites.basic.skip_extended_tests=yes ...
+```
+
+The variable can also be configured in your `kyua.conf`. See the documentation
+for `kyua.conf` for details.

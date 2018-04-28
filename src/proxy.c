@@ -55,46 +55,18 @@
 #include "iostring.h"
 #include "uri.h"
 
+#ifdef __linux__
+/* splice(2) is only available on Linux. */
+#include <fcntl.h>
+#else
+/* for PIPE_SIZE */
+#include <sys/pipe.h>
+#endif
+
 enum { SUCCESS = 0, FAILURE = -1 };
 
 #define LISTEN_BACKLOG 8 // FIXME: what is a good value for this?
 #define RECV_BUFLEN (REQUEST_LINE_MIN_BUFLEN*2)
-
-#ifdef __linux__
-/*
- * splice(2) is only available on Linux.
- */
-#include <fcntl.h>
-#else
-/*
- * Everything else has to use this shim.
- */
-#define BUFLEN 4096 // FIXME: what is a good value for this?
-static ssize_t
-splice(int fd_in, void *_off_in,
-       int fd_out, void *_off_out,
-       size_t len, unsigned int _flags)
-{
-    char buf[BUFLEN];
-    int res;
-
-    while (len) {
-        res = read(fd_in, buf, BUFLEN);
-        if (res == FAILURE) {
-            perror("splice(): read failed");
-            return FAILURE;
-        }
-        res = write(fd_out, buf, res);
-        if (res == FAILURE) {
-            perror("splice(): write failed");
-            return FAILURE;
-        }
-        len -= res;
-    }
-
-    return len;
-}
-#endif
 
 /*
  * The proxy context object contains data commonly used by proxy methods.
@@ -287,6 +259,11 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
     }
 
     if (more) {
+#ifdef __linux__
+        //
+        // splice(2) is only available on Linux.
+        //
+
         // splice(2) uses a pipe as an in-kernel "buffer" for zero-copy
         // transfer between sockets.
         // http://yarchive.net/comp/linux/splice.html
@@ -294,7 +271,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 
         if (pipe(pipefd) == FAILURE) {
             if (verbose)
-                perror("send_response: failed to create a pipe");
+                perror("proxy_send_response: failed to create a pipe");
             return FAILURE;
         }
 
@@ -309,14 +286,14 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
                 // XXX: should we retry?
                 if (verbose)
                     fprintf(stderr,
-                            "send_response: expected %lu more bytes, found 0",
+                            "proxy_send_response: expected %lu more bytes, found 0",
                             remaining);
                 res = FAILURE;
                 break;
             }
             if (res == FAILURE) {
                 // TODO: Check for EAGAIN to retry?
-                perror("send_response: failed to splice from socket");
+                perror("proxy_send_response: failed to splice from socket");
                 break;
             }
 
@@ -334,7 +311,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
                     break;
                 if (res1 == FAILURE) {
                     // TODO: Check for EAGAIN to retry?
-                    perror("send_response: failed to splice to socket");
+                    perror("proxy_send_response: failed to splice to socket");
                     res = FAILURE;
                     break;
                 }
@@ -353,6 +330,50 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 
         if (res == FAILURE)
             return FAILURE;
+#else
+        //
+        // Everything else has to copy to and from userspace.
+        //
+        char buf[PIPE_SIZE];
+
+        while (remaining > 0) {
+            // Buffer a chunk of data from the server.
+            // We want to read as much as possible without blocking.
+            res = recv(proxy->server_fd, buf, PIPE_SIZE, MSG_DONTWAIT);
+            if (res == 0)
+                break; // peer closed connection
+            if (res == FAILURE) {
+                if (errno == EAGAIN)
+                    continue;
+                perror("proxy_send_response: read failed");
+                return FAILURE;
+            }
+
+            n = res;
+
+            // Write the buffer to the client.
+            // We won't necessarily get to write the full chunk in one go,
+            // so this loops until the buffer has been completely drained.
+            do {
+                ssize_t const res1 = write(proxy->client_fd, buf, n);
+                if (res1 == 0)
+                    break; // XXX: should we retry?
+                if (res1 == FAILURE) {
+                    perror("proxy_send_response: write failed");
+                    return FAILURE;
+                }
+                n -= res1;
+            } while (n);
+
+            if (res == FAILURE)
+                break; // The inner loop failed, break out of the outer loop
+
+            remaining -= res;
+        }
+
+        if (res == FAILURE)
+            return FAILURE;
+#endif
     }
 
     return len + more;
