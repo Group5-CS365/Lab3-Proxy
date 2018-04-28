@@ -23,7 +23,8 @@ base_body() {
     echo "actual request:"
     hexdump -C test.out
 
-    diff -u test.ok test.out
+    diff -u test.ok test.out \
+        || atf_fail "Actual request did not match expected"
 }
 
 atf_test_case request1
@@ -152,7 +153,6 @@ Accept: */*\r
 \r
 "
     echo "TODO: 400 response" > test.ok
-
     base_body
 }
 
