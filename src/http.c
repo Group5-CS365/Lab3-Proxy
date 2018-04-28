@@ -32,7 +32,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 /*
  * Request Line
  */

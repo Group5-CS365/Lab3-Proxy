@@ -28,7 +28,7 @@
 */
 
 #include "proxy.h"
-
+ 
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -79,6 +79,14 @@ struct proxy {
     struct sockaddr_in client_addr;
 };
 
+struct http_error errors[] = {
+	{
+		{ "400: ", 5 },
+		{ "Bad Request - ", 14 },
+		{ "The client request is invalid", 29 }
+	},
+	
+};
 
 /*
  * Initialize a proxy data structure and start listening.
@@ -186,6 +194,32 @@ connect_server(char *host, char *port)
     freeaddrinfo(aip);
 
     return fd;
+}
+
+/*
+ * Send an error response with a given status and reason on the socket fd.
+ *
+ */
+static ssize_t
+send_error(struct proxy *proxy, enum http_status_code status) {
+	
+
+ 	struct iovec parts[] = {
+		{ // Status
+			.iov_base = errors[status].status.p,
+			.iov_len = errors[status].status.len
+		},
+		{ // Reason
+			.iov_base = errors[status].reason.p,
+			.iov_len = errors[status].reason.len
+		},
+		{ // Body
+			.iov_base = errors[status].body.p,
+			.iov_len = errors[status].body.len
+		},
+	};
+
+	return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
 /*
@@ -477,8 +511,9 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         debug_http_request_line(reqline);
 
     if (!reqline.valid) {
-        if (verbose)
-            fputs("malformed request (invalid request line)\n", stderr);
+		if(verbose)
+			fputs("malformed request (invalid request line)\n", stderr);
+		send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -505,9 +540,11 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     // Skip over CRLF.
     n -= 2;
     p += 2;
+	// TODO: Develop test to trigger this error
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
+		send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -519,6 +556,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (!uri.valid) {
         if (verbose)
             fputs("malformed request (invalid URI)\n", stderr);
+		send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
 

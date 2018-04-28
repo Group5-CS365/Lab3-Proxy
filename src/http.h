@@ -35,7 +35,6 @@
 
 #include "iostring.h"
 
-
 /*
  * Request Line
  */
@@ -119,5 +118,21 @@ struct http_header_field parse_http_header_field(char *buf, size_t len);
  * Otherwise, warns that the data is not valid.
  */
 void debug_http_header_field(struct http_header_field);
+
+/*
+ * Status Code
+ */
+
+enum http_status_code { BAD_REQUEST, UNAUTHORIZED, FORBIDDEN,
+						NOT_FOUND, INTERNAL_ERROR, NOT_IMPLEMENTED,
+						BAD_GATEWAY, UNAVAILABLE };
+
+/*
+ * Error 
+ */
+
+struct http_error {
+	struct iostring status, reason, body;
+};
 
 #endif // _http_h_

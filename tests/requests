@@ -27,6 +27,18 @@ base_body() {
         || atf_fail "Actual request did not match expected"
 }
 
+error_body() {
+    proxy -v ${PROXY_PORT} 2> test.err &
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in > test.out
+
+    echo "expected response:"
+    hexdump -C test.ok
+    echo "actual response:"
+    hexdump -C test.out
+
+    diff -u test.ok test.out
+}
+
 atf_test_case request1
 request1_head() {
     base_head "The proxy removes the Proxy-Connection header"
@@ -141,7 +153,7 @@ Accept: */*\r
 
 atf_test_case request6
 request6_head() {
-    base_head "Rejects request when target URI not in absolute-form"
+    base_head "Rejects request when target URI is not in absolute-form"
 }
 request6_body() {
     printf > test.in "\
