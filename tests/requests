@@ -164,8 +164,53 @@ User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
 "
-    echo "TODO: 400 response" > test.ok
-    base_body
+    echo "400: Bad Request - The client request is invalid" > test.ok
+
+    error_body
+}
+
+atf_test_case request7
+request7_head() {
+    base_head "The client sends a malformed request with insufficient ws to the proxy"
+}
+request7_body() {
+    local path query fragment
+    path="/hello"
+    query="?p=q&s=t;f"
+    fragment="#xyz"
+    printf > test.in "\
+GET http://${SERVER}${path}${query}${fragment} HTTP 1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    printf "400: Bad Request - The client request is invalid" > test.ok
+
+    error_body
+}
+
+atf_test_case request8
+request8_head() {
+    base_head "The client sends a malformed uri to the proxy"
+}
+request8_body() {
+    local path query fragment
+    path="/hello"
+    query="?p=q&s=t;f"
+    fragment="#xyz"
+    printf > test.in "\
+GET htp://${SERVER}${path}${query}${fragment} HTTP 1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    printf "400: Bad Request - The client request is invalid" > test.ok
+
+    error_body
 }
 
 atf_init_test_cases() {
@@ -175,6 +220,8 @@ atf_init_test_cases() {
     atf_add_test_case request4
     atf_add_test_case request5
     atf_add_test_case request6
+	atf_add_test_case request7
+	atf_add_test_case request8
 }
 
 # Local Variables:

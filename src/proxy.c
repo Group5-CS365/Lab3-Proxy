@@ -28,7 +28,7 @@
 */
 
 #include "proxy.h"
- 
+
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -85,7 +85,6 @@ struct http_error errors[] = {
 		{ "Bad Request - ", 14 },
 		{ "The client request is invalid", 29 }
 	},
-	
 };
 
 /*
@@ -198,28 +197,25 @@ connect_server(char *host, char *port)
 
 /*
  * Send an error response with a given status and reason on the socket fd.
- *
  */
 static ssize_t
 send_error(struct proxy *proxy, enum http_status_code status) {
-	
+    struct iovec parts[] = {
+        { // Status
+            .iov_base = errors[status].status.p,
+            .iov_len = errors[status].status.len
+        },
+        { // Reason
+            .iov_base = errors[status].reason.p,
+            .iov_len = errors[status].reason.len
+        },
+        { // Body
+            .iov_base = errors[status].body.p,
+            .iov_len = errors[status].body.len
+        },
+    };
 
- 	struct iovec parts[] = {
-		{ // Status
-			.iov_base = errors[status].status.p,
-			.iov_len = errors[status].status.len
-		},
-		{ // Reason
-			.iov_base = errors[status].reason.p,
-			.iov_len = errors[status].reason.len
-		},
-		{ // Body
-			.iov_base = errors[status].body.p,
-			.iov_len = errors[status].body.len
-		},
-	};
-
-	return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
+    return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
 /*
