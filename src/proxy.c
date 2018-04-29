@@ -191,40 +191,162 @@ connect_server(char *host, char *port)
  * Send an error response with a given status and reason on the socket fd.
  */
 static ssize_t
-send_error(struct proxy *proxy, enum http_status_code status) {
+send_error(struct proxy *proxy, enum http_status_code status)
+{
+    struct iovec parts[] = {
+        { // Version
+            .iov_base = "HTTP/1.0 ",
+            .iov_len = 9
+        },
+        // Status
+        IOSTRING_TO_IOVEC(http_errors[status].status),
 
-	struct iovec parts[] = {
-		{ // Version
-			.iov_base = "HTTP/1.0 ",
-			.iov_len = 9
-		},
-		// Status
-		IOSTRING_TO_IOVEC(http_errors[status].status),
+        { // ws
+            .iov_base = " ",
+            .iov_len = 1
+        },
+        // Reason
+        IOSTRING_TO_IOVEC(http_errors[status].reason),
 
-		{ // ws
-			.iov_base = " ",
-			.iov_len = 1
-		},
-		// Reason
-		IOSTRING_TO_IOVEC(http_errors[status].reason),
+        { // Content Type and Content Length name
+            .iov_base = "\r\nContent-Type: text/plain\r\nContent-Length: ",
+            .iov_len = 44
+        },
+        // Content-Length
+        IOSTRING_TO_IOVEC (http_errors[status].content_length),
 
-		{ // Content Type and Content Length name
-			.iov_base = "\r\nContent-Type: text/plain\r\nContent-Length: ",
-			.iov_len = 44
-		},
-		// Content-Length
-		IOSTRING_TO_IOVEC (http_errors[status].content_length),
+        { // Carriage return and Newline
+            .iov_base = "\r\n\r\n",
+            .iov_len = 4
+        },
+        // Body
+        IOSTRING_TO_IOVEC(http_errors[status].body)
+    };
 
-		{ // Carriage return and Newline
-			.iov_base = "\r\n\r\n",
-			.iov_len = 4
-		},
-		// Body
-		IOSTRING_TO_IOVEC(http_errors[status].body)
-	};
+    // TODO: Add 500 Error
+    return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
+}
 
-	// TODO: Add 500 Error
-	return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
+enum {
+    PIPE_FAIL      = -2,
+    SPLICE_RX_FAIL = -3,
+    SPLICE_TX_FAIL = -4,
+    READ_FAIL      = -5,
+    WRITE_FAIL     = -6,
+    RX_SHORT       = -7
+};
+
+/*
+ * Transfer len bytes from rx_fd to tx_fd.
+ *
+ * On Linux, this uses splice(2) to avoid copying the data.
+ * On other platforms, splice(2) is not available so the data must be buffered
+ * in userspace.
+ */
+static ssize_t
+splice_loop(int rx_fd, int tx_fd, size_t len)
+{
+    ssize_t n, res, remaining = len;
+#ifdef __linux__
+    //
+    // splice(2) is only available on Linux.
+    //
+
+    // splice(2) uses a pipe as an in-kernel "buffer" for zero-copy
+    // transfer between sockets.
+    // http://yarchive.net/comp/linux/splice.html
+    int pipefd[2];
+
+    if (pipe(pipefd) == FAILURE)
+        return PIPE_FAIL;
+
+    while (remaining > 0) {
+        // Move a chunk of data from the rx socket to the pipe.
+        // We want to read as much as possible without blocking.
+        // NB: INT_MAX is the maximum size allowed by splice(2).
+        res = splice(rx_fd, NULL,
+                     pipefd[1], NULL,
+                     INT_MAX, SPLICE_F_NONBLOCK);
+        if (res == 0) {
+            // XXX: should we retry?
+            res = RX_SHORT;
+            break;
+        }
+        if (res == FAILURE) {
+            // TODO: Check for EAGAIN to retry?
+            res = SPLICE_RX_FAIL;
+            break;
+        }
+
+        n = res;
+
+        // Move a chunk of data from the pipe to the tx socket.
+        // We won't necessarily get to write the full chunk in one go,
+        // so this loops until the pipe has been completely drained.
+        do {
+            ssize_t const res1 = splice(pipefd[0], NULL,
+                                        tx_fd, NULL,
+                                        n, 0);
+            if (res1 == 0)
+                // XXX: should we retry?
+                break;
+            if (res1 == FAILURE) {
+                // TODO: Check for EAGAIN to retry?
+                res = SPLICE_TX_FAIL;
+                break;
+            }
+
+            n -= res1;
+        } while (n);
+
+        if (res < SUCCESS)
+            break; // The inner loop failed, break out of the outer loop.
+
+        remaining -= res;
+    }
+
+    close(pipefd[0]);
+    close(pipefd[1]);
+
+    if (res < SUCCESS)
+        return res;
+#else
+    //
+    // Everything else has to copy to and from userspace.
+    //
+    char buf[PIPE_SIZE];
+
+    while (remaining > 0) {
+        // Buffer a chunk of data from the rx socket.
+        // We want to read as much as possible without blocking.
+        res = recv(rx_fd, buf, PIPE_SIZE, MSG_DONTWAIT);
+        if (res == 0)
+            break; // peer closed connection
+        if (res == FAILURE) {
+            if (errno == EAGAIN)
+                continue;
+            return READ_FAIL;
+        }
+
+        n = res;
+
+        // Write the buffer to the tx socket.
+        // We won't necessarily get to write the full chunk in one go,
+        // so this loops until the buffer has been completely drained.
+        do {
+            ssize_t const res1 = write(tx_fd, buf, n);
+            if (res1 == 0)
+                break; // XXX: should we retry?
+            if (res1 == FAILURE)
+                return WRITE_FAIL;
+            n -= res1;
+        } while (n);
+
+        remaining -= res;
+    }
+#endif
+
+    return len;
 }
 
 /*
@@ -241,14 +363,24 @@ send_error(struct proxy *proxy, enum http_status_code status) {
  /
  / Using iovecs we can remove the URI from the request by skipping over it,
  / while only needing to make one syscall. Likewise for Proxy-Connection.
+ /
+ / If more data is expected than what was in the buffer, the remaining data is
+ / forwarded to the server in chunks. On Linux, this takes advantage of
+ / splice(2) for zero-copy transfers. On everything else, it buffers PIPE_SIZE
+ / bytes at a time.
  */
 static ssize_t
-send_request(int server_fd,
-             struct http_request_line reqln,
-             struct uri uri,
-             struct http_header_field proxyconn,
-             size_t len)
+proxy_send_request(struct proxy *proxy,
+                   struct http_request_line reqln,
+                   struct uri uri,
+                   struct http_header_field proxyconn,
+                   size_t len,
+                   size_t more)
 {
+    bool const verbose = proxy->verbose;
+    int const client_fd = proxy->client_fd;
+    int const server_fd = proxy->server_fd;
+
     char * const version = reqln.http_version.p - 1; // -1 for SP
     size_t const version_offset = version - reqln.method.p;
     size_t const proxyconn_offset = proxyconn.field_name.p - version;
@@ -260,10 +392,8 @@ send_request(int server_fd,
             .iov_base = reqln.method.p,
             .iov_len = reqln.method.len + 1
         },
-        { // Request path (minus proxy-to URI component)
-            .iov_base = uri.path_query_fragment.p,
-            .iov_len = uri.path_query_fragment.len
-        },
+        // Request path (minus proxy-to URI component)
+        IOSTRING_TO_IOVEC(uri.path_query_fragment),
         { // SP+Version+CRLF & Headers before Proxy-Connection OR The rest
             .iov_base = version,
             .iov_len = proxyconn.valid ? proxyconn_offset : rest_len
@@ -276,8 +406,38 @@ send_request(int server_fd,
     size_t const num_parts =
         sizeof parts / sizeof (struct iovec) - (proxyconn.valid ? 0 : 1);
 
-	// TODO: Add 500 Error
-    return writev(server_fd, parts, num_parts);
+    if (writev(server_fd, parts, num_parts) == FAILURE) {
+        if (verbose)
+            perror("proxy_send_request: failed to write request buffer");
+        return FAILURE;
+    }
+
+    if (more) {
+        switch(splice_loop(client_fd, server_fd, more)) {
+        case PIPE_FAIL:
+            perror("proxy_send_request: failed to create a pipe");
+            return FAILURE;
+        case SPLICE_RX_FAIL:
+            perror("proxy_send_request: failed to splice from server socket");
+            return FAILURE;
+        case SPLICE_TX_FAIL:
+            perror("proxy_send_request: failed to splice to client socket");
+            return FAILURE;
+        case READ_FAIL:
+            perror("proxy_send_request: failed to read from server socket");
+            return FAILURE;
+        case WRITE_FAIL:
+            perror("proxy_send_request: failed to write to client socket");
+            return FAILURE;
+        case RX_SHORT:
+            fputs("proxy_send_request: expected more data\n", stderr);
+            return FAILURE;
+        default:
+            break;
+        }
+    }
+
+    return len + more;
 }
 
 /*
@@ -288,141 +448,38 @@ static ssize_t
 proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 {
     bool const verbose = proxy->verbose;
+    int const client_fd = proxy->client_fd;
+    int const server_fd = proxy->server_fd;
 
-    ssize_t n, res, remaining = more;
-
-    res = write(proxy->client_fd, buf, len);
-    if (res == FAILURE) {
+    if (write(client_fd, buf, len) == FAILURE) {
         if (verbose)
-            perror("send_response: failed to write response buffer");
+            perror("proxy_send_response: failed to write response buffer");
         return FAILURE;
     }
 
     if (more) {
-#ifdef __linux__
-        //
-        // splice(2) is only available on Linux.
-        //
-
-        // splice(2) uses a pipe as an in-kernel "buffer" for zero-copy
-        // transfer between sockets.
-        // http://yarchive.net/comp/linux/splice.html
-        int pipefd[2];
-
-        if (pipe(pipefd) == FAILURE) {
-            if (verbose)
-                perror("proxy_send_response: failed to create a pipe");
+        switch(splice_loop(server_fd, client_fd, more)) {
+        case PIPE_FAIL:
+            perror("proxy_send_response: failed to create a pipe");
             return FAILURE;
-        }
-
-        while (remaining > 0) {
-            // Move a chunk of data from the server socket to the pipe.
-            // We want to read as much as possible without blocking.
-            // NB: INT_MAX is the maximum size allowed by splice(2).
-            res = splice(proxy->server_fd, NULL,
-                         pipefd[1], NULL,
-                         INT_MAX, SPLICE_F_NONBLOCK);
-            if (res == 0) {
-                // XXX: should we retry?
-                if (verbose)
-                    fprintf(stderr,
-                            "proxy_send_response: expected %lu more bytes, found 0\n",
-                            remaining);
-				// Timeout for now until we decide if we want to retry
-				send_error(proxy, TIMEOUT);
-                res = FAILURE;
-                break;
-            }
-            if (res == FAILURE) {
-                // TODO: Check for EAGAIN to retry?
-                perror("proxy_send_response: failed to splice from socket");
-                break;
-            }
-
-			n = res;
-
-            // Move a chunk of data from the pipe to the client socket.
-            // We won't necessarily get to write the full chunk in one go,
-            // so this loops until the pipe has been completely drained.
-            do {
-                ssize_t const res1 = splice(pipefd[0], NULL,
-                                            proxy->client_fd, NULL,
-                                            n, 0);
-                if (res1 == 0)
-                    // XXX: should we retry?
-                    break;
-                if (res1 == FAILURE) {
-                    // TODO: Check for EAGAIN to retry?
-                    perror("proxy_send_response: failed to splice to socket");
-                    res = FAILURE;
-                    break;
-                }
-
-				n -= res1;
-
-				if(n < 0) {
-					if(verbose)
-						fputs("proxy_send_response: timeout", stderr);
-					send_error(proxy, TIMEOUT);
-				}
-
-			} while (n);
-
-			if (res == FAILURE)
-                break; // The inner loop failed, break out of the outer loop.
-
-            remaining -= res;
-        }
-
-        close(pipefd[0]);
-        close(pipefd[1]);
-
-        if (res == FAILURE)
+        case SPLICE_RX_FAIL:
+            perror("proxy_send_response: failed to splice from server socket");
             return FAILURE;
-#else
-        //
-        // Everything else has to copy to and from userspace.
-        //
-        char buf[PIPE_SIZE];
-
-        while (remaining > 0) {
-            // Buffer a chunk of data from the server.
-            // We want to read as much as possible without blocking.
-            res = recv(proxy->server_fd, buf, PIPE_SIZE, MSG_DONTWAIT);
-            if (res == 0)
-                break; // peer closed connection
-            if (res == FAILURE) {
-                if (errno == EAGAIN)
-                    continue;
-                perror("proxy_send_response: read failed");
-                return FAILURE;
-            }
-
-            n = res;
-
-            // Write the buffer to the client.
-            // We won't necessarily get to write the full chunk in one go,
-            // so this loops until the buffer has been completely drained.
-            do {
-                ssize_t const res1 = write(proxy->client_fd, buf, n);
-                if (res1 == 0)
-                    break; // XXX: should we retry?
-                if (res1 == FAILURE) {
-                    perror("proxy_send_response: write failed");
-                    return FAILURE;
-                }
-                n -= res1;
-            } while (n);
-
-            if (res == FAILURE)
-                break; // The inner loop failed, break out of the outer loop
-
-            remaining -= res;
-        }
-
-        if (res == FAILURE)
+        case SPLICE_TX_FAIL:
+            perror("proxy_send_response: failed to splice to client socket");
             return FAILURE;
-#endif
+        case READ_FAIL:
+            perror("proxy_send_response: failed to read from server socket");
+            return FAILURE;
+        case WRITE_FAIL:
+            perror("proxy_send_response: failed to write to client socket");
+            return FAILURE;
+        case RX_SHORT:
+            perror("proxy_send_response: expected more data");
+            return FAILURE;
+        default:
+            break;
+        }
     }
 
     return len + more;
@@ -470,26 +527,25 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
             debug_http_header_field(field);
 
         if (strncasecmp("Content-Length",
-                        field.field_name.p, field.field_name.len) == SUCCESS) {
+                        field.field_name.p, field.field_name.len) == SUCCESS)
             content_length = strtoll(field.field_value.p, NULL, 10);
-        }
     }
 
-	// Skip over CRLF.
+    // Skip over CRLF.
     n -= 2;
     p += 2;
 
     if (p > end) {
         if (verbose)
             fputs("malformed response (too short)\n", stderr);
-		send_error(proxy, BAD_GATEWAY); 
+        send_error(proxy, BAD_GATEWAY);
         return FAILURE;
     }
 
     if (content_length < n) {
         if (verbose)
             fputs("malformed response (extra data)\n", stderr);
-		send_error(proxy, BAD_GATEWAY); 
+        send_error(proxy, BAD_GATEWAY);
         return FAILURE;
     }
 
@@ -515,10 +571,11 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 {
     bool const verbose = proxy->verbose;
     char const * const end = buf + len;
+    ssize_t content_length = 0;
     struct http_request_line reqline = parse_http_request_line(buf, len);
     struct http_header_field proxyconn = { .valid = false };
     char htmp, ptmp, *p = buf;
-    size_t n = len;
+    size_t n = len, more = 0;
     struct uri uri;
     struct iostring host, port;
     int fd;
@@ -527,9 +584,9 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         debug_http_request_line(reqline);
 
     if (!reqline.valid) {
-		if(verbose)
-			fputs("malformed request (invalid request line)\n", stderr);
-		send_error(proxy, BAD_REQUEST);
+        if(verbose)
+            fputs("malformed request (invalid request line)\n", stderr);
+        send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -551,18 +608,31 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         if (strncasecmp("Proxy-Connection",
                         field.field_name.p, field.field_name.len) == SUCCESS)
             proxyconn = field;
+        else if (strncasecmp("Content-Length",
+                             field.field_name.p, field.field_name.len) == SUCCESS)
+            content_length = strtoll(field.field_value.p, NULL, 10);
     }
 
-	// Skip over CRLF.
+    // Skip over CRLF.
     n -= 2;
     p += 2;
     // TODO: Develop test to trigger this error
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
-		send_error(proxy, BAD_REQUEST);
+        send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
+
+    if (content_length < n) {
+        if (verbose)
+            fputs("malformed request (extra data)\n", stderr);
+        send_error(proxy, BAD_REQUEST);
+        return FAILURE;
+    }
+
+    // n is the amount of the body already in the buffer.
+    more = content_length - n;
 
     uri = parse_uri(reqline.request_target.p, reqline.request_target.len);
 
@@ -572,7 +642,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (!uri.valid) {
         if (verbose)
             fputs("malformed request (invalid URI)\n", stderr);
-		send_error(proxy, BAD_REQUEST);
+        send_error(proxy, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -589,7 +659,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     fd = connect_server(host.p, port.p);
     if (fd == FAILURE) {
         fputs("proxy_handle_request(): failed to connect to server\n", stderr);
-		send_error(proxy, INTERNAL_ERROR);
+        send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 
@@ -600,18 +670,19 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (ptmp != '\0')
         port.p[port.len] = ptmp;
 
-    if (send_request(fd,
-                     reqline,
-                     uri,
-                     proxyconn,
-                     len) == FAILURE) {
+    if (proxy_send_request(proxy,
+                           reqline,
+                           uri,
+                           proxyconn,
+                           len,
+                           more) == FAILURE) {
         if (verbose)
             perror("failed to send request");
-		send_error(proxy, INTERNAL_ERROR);
+        send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 
-    return SUCCESS;
+    return content_length;
 }
 
 static int

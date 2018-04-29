@@ -165,7 +165,8 @@ User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
 "
-    printf > test.ok "HTTP/1.0 400 Bad Request\r
+    printf > test.ok "\
+HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r
@@ -191,7 +192,8 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf > test.ok "HTTP/1.0 400 Bad Request\r
+    printf > test.ok "\
+HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r
@@ -217,13 +219,33 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf > test.ok "HTTP/1.0 400 Bad Request\r
+    printf > test.ok "\
+HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r
 The client request is invalid"
 
 	error_body
+}
+
+atf_test_case request9
+request9_head() {
+    base_head "Large request body"
+}
+request9_body() {
+    local content_length
+    content_length=64000000 # 64MB > 2*8000 (size of request buffer)
+    printf > test.in "\
+POST http://${SERVER}/upload HTTP/1.0\r
+Host: ${SERVER}\r
+Content-Type: application/octet-stream\r
+Content-Length: ${content_length}\r
+\r
+"
+    dd if=/dev/zero bs=${content_length} count=1 >> test.in
+    sed "s#http://${SERVER}##" test.in > test.ok
+    base_body
 }
 
 atf_init_test_cases() {
@@ -233,8 +255,9 @@ atf_init_test_cases() {
     atf_add_test_case request4
     atf_add_test_case request5
     atf_add_test_case request6
-	atf_add_test_case request7
-	atf_add_test_case request8
+    atf_add_test_case request7
+    atf_add_test_case request8
+    atf_add_test_case request9
 }
 
 # Local Variables:
