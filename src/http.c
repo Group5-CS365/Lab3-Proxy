@@ -245,11 +245,11 @@ parse_http_status_line(char *buf, size_t len)
         fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
         return line;
     }
-	
-    line.valid = true;
-    line.end = p + 1;
 
-    return line;
+	line.valid = true;
+	line.end = p + 1;
+
+	return line;
 }
 
 void

@@ -505,7 +505,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
  */
 static ssize_t
 proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
-{ 
+{
     bool const verbose = proxy->verbose;
     char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
@@ -545,8 +545,8 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
                         field.field_name.p, field.field_name.len) == SUCCESS)
             proxyconn = field;
     }
-	
-    // Skip over CRLF.
+
+	// Skip over CRLF.
     n -= 2;
     p += 2;
     // TODO: Develop test to trigger this error
