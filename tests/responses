@@ -18,7 +18,6 @@ base_head() {
     atf_set "descr" \
             "${1:-A given response produces the expected response at the client}"
 }
-
 base_body() {
     nc -l ${SERVER_PORT} < test.in &
     proxy -v ${PROXY_PORT} &
@@ -59,70 +58,11 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_test_case response2
 response2_head() {
-    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
-}
-response2_body() {
-    printf > test.in "\
-HTTP/1.1 404 Not Found\r
-Date: Sat, 21 Apr 2018 02:24:10 GMT\r
-Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
-Content-Length: 2147483648\r
-Content-Type: text/html; charset=iso-8859-1\r
-\r
-<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /index.html was not found on this server.</p>
-</body></html>
-"
-    printf > test.ok "\
-HTTP/1.0 504 Gateway Timeout\r
-Content-Type: text/plain\r
-Content-Length: 33\r
-\r
-The server response took too long"
-    base_body
-}
-
-atf_test_case response3
-response3_head() {
-    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
-}
-response3_body() {
-    printf > test.in "\
-HTTP/1.1 404 Not Found\r
-Date: Sat, 21 Apr 2018 02:24:10 GMT\r
-Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
-Content-Length: 2147483647\r
-Content-Type: text/html; charset=iso-8859-1\r
-\r
-<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /index.html was not found on this server.</p>
-</body></html>
-"
-    printf > test.ok "\
-HTTP/1.0 504 Gateway Timeout\r
-Content-Type: text/plain\r
-Content-Length: 33\r
-\r
-The server response took too long"
-
-    base_body
-}
-
-atf_test_case response4
-response4_head() {
     atf_set "timeout" 60
     atf_set "require.progs" "hexdump diff nc printf proxy sed stat"
-    atf_set "descr" "Large content"
+    atf_set "descr" "Large response"
 }
-response4_body() {
+response2_body() {
     local server path skip full_len http_len content_len
 
     server="blue.cs.sonoma.edu"
@@ -175,71 +115,9 @@ Accept: */*\r
     atf_check_equal 3348465664 ${content_len}
 }
 
-atf_test_case response5
-response5_head() {
-    base_head "The server's response is too short"
-}
-response5_body() {
-    printf > test.in "\
-HTTP/1.1 404 Not Found\r
-Date: Sat, 21 Apr 2018 02:24:10 GMT\r
-Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
-Content-Length: 208\r
-Content-Type: text/html; charset=iso-8859-1\r
-"
-    printf > test.ok "\
-HTTP/1.0 502 Bad Gateway\r
-Content-Type: text/plain\r
-Content-Length: 39\r
-\r
-The response from the server is invalid"
-
-    base_body
-}
-
-atf_test_case response6
-response6_head() {
-    base_head "The server responds with an invalid status line"
-}
-response6_body() {
-    printf > test.in "\
-HTTP/1.1
-"
-    printf > test.ok "\
-HTTP/1.0 502 Bad Gateway\r
-Content-Type: text/plain\r
-Content-Length: 39\r
-\r
-The response from the server is invalid"
-
-    base_body
-}
-
-atf_test_case response
-response7_head() {
-    base_head "The server responds with too much data"
-}
-response7_body() {
-    printf > test.in "\
-HTTP/1.1
-"
-    printf > test.ok "\
-HTTP/1.0 502 Bad Gateway\r
-Content-Type: text/plain\r
-Content-Length: 39\r
-\r
-The response from the server is invalid"
-
-    base_body
-}
-
 atf_init_test_cases() {
     atf_add_test_case response1
     atf_add_test_case response2
-    atf_add_test_case response3
-    atf_add_test_case response4
-    atf_add_test_case response5
-    atf_add_test_case response6
 }
 
 # Local Variables:

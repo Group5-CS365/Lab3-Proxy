@@ -27,19 +27,6 @@ base_body() {
         || atf_fail "Actual request did not match expected"
 }
 
-error_body() {
-    proxy -v ${PROXY_PORT} 2> test.err &
-    nc ${PROXY_HOST} ${PROXY_PORT} < test.in > test.out
-
-    echo "expected response:"
-    hexdump -C test.ok
-    echo "actual response:"
-    hexdump -C test.out
-
-    diff -u test.ok test.out \
-        || atf_fail "Actual request did not match expected"
-}
-
 atf_test_case request1
 request1_head() {
     base_head "The proxy removes the Proxy-Connection header"
@@ -154,86 +141,10 @@ Accept: */*\r
 
 atf_test_case request6
 request6_head() {
-    base_head "Rejects request when target URI is not in absolute-form"
+    atf_set "require.progs" "dd diff hexdump nc printf proxy sed"
+    atf_set "descr" "Large request body"
 }
 request6_body() {
-    printf > test.in "\
-GET / HTTP/1.1\r
-Proxy-Connection: Keep-Alive\r
-Host: ${SERVER}\r
-User-Agent: curl/7.54.0\r
-Accept: */*\r
-\r
-"
-    printf > test.ok "\
-HTTP/1.0 400 Bad Request\r
-Content-Type: text/plain\r
-Content-Length: 29\r
-\r
-The client request is invalid"
-
-    error_body
-}
-
-atf_test_case request7
-request7_head() {
-    base_head "The client sends a malformed request with insufficient ws to the proxy"
-}
-request7_body() {
-    local path query fragment
-    path="/hello"
-    query="?p=q&s=t;f"
-    fragment="#xyz"
-    printf > test.in "\
-GET http://${SERVER}${path}${query}${fragment} HTTP 1.1\r
-Host: ${SERVER}\r
-User-Agent: curl/7.54.0\r
-Accept: */*\r
-Proxy-Connection: Keep-Alive\r
-\r
-"
-    printf > test.ok "\
-HTTP/1.0 400 Bad Request\r
-Content-Type: text/plain\r
-Content-Length: 29\r
-\r
-The client request is invalid"
-
-    error_body
-}
-
-atf_test_case request8
-request8_head() {
-    base_head "The client sends a malformed uri to the proxy"
-}
-request8_body() {
-    local path query fragment
-    path="/hello"
-    query="?p=q&s=t;f"
-    fragment="#xyz"
-    printf > test.in "\
-GET htp://${SERVER}${path}${query}${fragment} HTTP 1.1\r
-Host: ${SERVER}\r
-User-Agent: curl/7.54.0\r
-Accept: */*\r
-Proxy-Connection: Keep-Alive\r
-\r
-"
-    printf > test.ok "\
-HTTP/1.0 400 Bad Request\r
-Content-Type: text/plain\r
-Content-Length: 29\r
-\r
-The client request is invalid"
-
-    error_body
-}
-
-atf_test_case request9
-request9_head() {
-    base_head "Large request body"
-}
-request9_body() {
     local content_length
     content_length=64000000 # 64MB > 2*8000 (size of request buffer)
     printf > test.in "\
@@ -255,9 +166,6 @@ atf_init_test_cases() {
     atf_add_test_case request4
     atf_add_test_case request5
     atf_add_test_case request6
-    atf_add_test_case request7
-    atf_add_test_case request8
-    atf_add_test_case request9
 }
 
 # Local Variables:
