@@ -78,19 +78,6 @@ Content-Type: text/html; charset=iso-8859-1\r
 </body></html>
 "
     printf > test.ok "\
-HTTP/1.1 404 Not Found\r
-Date: Sat, 21 Apr 2018 02:24:10 GMT\r
-Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
-Content-Length: 2147483648\r
-Content-Type: text/html; charset=iso-8859-1\r
-\r
-<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /index.html was not found on this server.</p>
-</body></html>
 HTTP/1.0 504 Gateway Timeout\r
 Content-Type: text/plain\r
 Content-Length: 33\r
@@ -120,19 +107,6 @@ Content-Type: text/html; charset=iso-8859-1\r
 </body></html>
 "
     printf > test.ok "\
-HTTP/1.1 404 Not Found\r
-Date: Sat, 21 Apr 2018 02:24:10 GMT\r
-Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
-Content-Length: 2147483647\r
-Content-Type: text/html; charset=iso-8859-1\r
-\r
-<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
-<html><head>
-<title>404 Not Found</title>
-</head><body>
-<h1>Not Found</h1>
-<p>The requested URL /index.html was not found on this server.</p>
-</body></html>
 HTTP/1.0 504 Gateway Timeout\r
 Content-Type: text/plain\r
 Content-Length: 33\r
