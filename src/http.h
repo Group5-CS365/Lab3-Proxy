@@ -128,7 +128,7 @@ enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, BAD_GATEWAY, TIMEOUT, STATU
 /*
  * Error 
  */
-struct http_error {
+extern struct http_error {
 	struct iostring status, reason, content_length, body;
 } const http_errors[STATUS_COUNT];
 

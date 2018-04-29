@@ -177,7 +177,7 @@ Content-Length: 208\r
 Content-Type: text/html; charset=iso-8859-1\r
 "
 	printf > test.ok "\
-HTTP/1.1 502 Bad Gateway\r
+HTTP/1.0 502 Bad Gateway\r
 Content-Type: text/plain\r
 Content-Length: 39\r
 \r
@@ -195,7 +195,7 @@ response6_body() {
 HTTP/1.1
 "
     printf > test.ok "\
-HTTP/1.1 502 Bad Gateway\r
+HTTP/1.0 502 Bad Gateway\r
 Content-Type: text/plain\r
 Content-Length: 39\r
 \r
@@ -213,7 +213,7 @@ response7_body() {
 HTTP/1.1
 "
 	printf > test.ok "\
-HTTP/1.1 502 Bad Gateway\r
+HTTP/1.0 502 Bad Gateway\r
 Content-Type: text/plain\r
 Content-Length: 39\r
 \r

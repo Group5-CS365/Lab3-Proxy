@@ -36,7 +36,8 @@ error_body() {
     echo "actual response:"
     hexdump -C test.out
 
-    diff -u test.ok test.out
+	diff -u test.ok test.out \
+        || atf_fail "Actual request did not match expected"
 }
 
 atf_test_case request1
@@ -164,7 +165,7 @@ User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
 "
-    printf > test.ok "HTTP/1.1 400 Bad Request\r
+    printf > test.ok "HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r
@@ -190,7 +191,7 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf > test.ok "HTTP/1.1 400 Bad Request\r
+    printf > test.ok "HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r
@@ -216,7 +217,7 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf > test.ok "HTTP/1.1 400 Bad Request\r
+    printf > test.ok "HTTP/1.0 400 Bad Request\r
 Content-Type: text/plain\r
 Content-Length: 29\r
 \r

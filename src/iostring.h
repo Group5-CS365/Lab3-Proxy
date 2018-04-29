@@ -30,10 +30,7 @@
 #ifndef _iostring_h_
 #define _iostring_h_
 
-#define IOSTRING_TO_IOVEC(s) { .iov_base = (s).p, .iov_len = (s).len }
-
 #include <stdlib.h>
-
 
 /*
  * An iostring does not need to be nul-terminated.
@@ -44,5 +41,7 @@ struct iostring {
     char *p;
     size_t len;
 };
+
+#define IOSTRING_TO_IOVEC(s) { .iov_base = (s).p, .iov_len = (s).len }
 
 #endif // _iostring_h_

@@ -195,7 +195,7 @@ send_error(struct proxy *proxy, enum http_status_code status) {
 
 	struct iovec parts[] = {
 		{ // Version
-			.iov_base = "HTTP/1.1 ",
+			.iov_base = "HTTP/1.0 ",
 			.iov_len = 9
 		},
 		// Status
@@ -491,7 +491,6 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (proxy_send_response(proxy, buf, len, more) == FAILURE) {
         fputs("proxy_handle_response(): failed to send response\n", stderr);
         // If we can't send a response, there's nothing more we can do.
-		send_error(proxy, INTERNAL_ERROR); 
         proxy_cleanup(proxy);
         exit(EXIT_FAILURE);
     }
