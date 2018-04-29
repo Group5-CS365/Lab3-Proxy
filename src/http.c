@@ -41,8 +41,8 @@ struct http_error const http_errors[STATUS_COUNT] = {
 	HTTP_ERROR(500, "Internal Server Error", 21,
 				  "The proxy encountered an unexpected condition", 45, 2),
 	HTTP_ERROR(502, "Bad Gateway", 11,
-				  "The response from the server is invalid", 39, 2),	
-    HTTP_ERROR(504, "Gateway Timeout", 15,
+			   "The response from the server is invalid", 39, 2),
+	HTTP_ERROR(504, "Gateway Timeout", 15,
 				  "The server response took too long", 33, 2),
 };
 
@@ -136,8 +136,8 @@ parse_http_request_line(char *buf, size_t len)
         return line;
     }
 
-    line.valid = true;
-    line.end = p + 1;
+	line.valid = true;
+	line.end = p + 1;
 
     return line;
 }

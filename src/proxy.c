@@ -192,8 +192,8 @@ connect_server(char *host, char *port)
  */
 static ssize_t
 send_error(struct proxy *proxy, enum http_status_code status) {
-	
- 	struct iovec parts[] = {
+
+	struct iovec parts[] = {
 		{ // Version
 			.iov_base = "HTTP/1.1 ",
 			.iov_len = 9
@@ -220,9 +220,10 @@ send_error(struct proxy *proxy, enum http_status_code status) {
 			.iov_len = 4
 		},
 		// Body
-		IOSTRING_TO_IOVEC(http_errors[status].body)	
+		IOSTRING_TO_IOVEC(http_errors[status].body)
 	};
 
+	// TODO: Add 500 Error
 	return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
@@ -275,6 +276,7 @@ send_request(int server_fd,
     size_t const num_parts =
         sizeof parts / sizeof (struct iovec) - (proxyconn.valid ? 0 : 1);
 
+	// TODO: Add 500 Error
     return writev(server_fd, parts, num_parts);
 }
 
@@ -426,13 +428,13 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
  */
 static ssize_t
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
-{ 
-    char const * const end = buf + len;
-    ssize_t content_length = 0;
-    struct http_status_line statline = parse_http_status_line(buf, len);
-    char *p = buf;
-    size_t n = len, more = 0;
-    bool const verbose = proxy->verbose;
+{
+	char const * const end = buf + len;
+	ssize_t content_length = 0;
+	struct http_status_line statline = parse_http_status_line(buf, len);
+	char *p = buf;
+	size_t n = len, more = 0;
+	bool const verbose = proxy->verbose;
 
     if (verbose)
         debug_http_status_line(statline);
@@ -465,7 +467,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
         }
     }
 
-    // Skip over CRLF.
+	// Skip over CRLF.
     n -= 2;
     p += 2;
 
@@ -630,6 +632,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive request");
+			// TODO: Add 500 Internal Error
             res = EXIT_FAILURE;
             break;
         }
@@ -659,6 +662,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive response");
+			// TODO: Add 500 Internal Error
             res = EXIT_FAILURE;
             break;
         }
