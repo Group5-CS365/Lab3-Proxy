@@ -163,6 +163,64 @@ Accept: */*\r
     atf_check_equal 3348465664 ${content_len}
 }
 
+atf_test_case response5
+response5_head() {
+    base_head "The server's response is too short"
+}
+response5_body() {
+    printf > test.in "\
+HTTP/1.1 404 Not Found\r
+Date: Sat, 21 Apr 2018 02:24:10 GMT\r
+Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
+Content-Length: 208\r
+Content-Type: text/html; charset=iso-8859-1\r
+"
+	printf > test.ok "\
+HTTP/1.1 502 Bad Gateway\r
+Content-Type: text/plain\r
+Content-Length: 39\r
+\r
+The response from the server is invalid" 
+	
+    base_body
+}
+
+atf_test_case response6
+response6_head() {
+    base_head "The server responds with an invalid status line"
+}
+response6_body() {
+    printf > test.in "\
+HTTP/1.1
+"
+    printf > test.ok "\
+HTTP/1.1 502 Bad Gateway\r
+Content-Type: text/plain\r
+Content-Length: 39\r
+\r
+The response from the server is invalid" 
+	
+    base_body
+}
+
+atf_test_case response
+response7_head() {
+    base_head "The server responds with too much data"
+}
+response7_body() {
+    printf > test.in "\
+HTTP/1.1
+"
+	printf > test.ok "\
+HTTP/1.1 502 Bad Gateway\r
+Content-Type: text/plain\r
+Content-Length: 39\r
+\r
+The response from the server is invalid" 
+	
+    base_body
+} 
+
 atf_init_test_cases() {
     atf_add_test_case response1
     atf_add_test_case response2
