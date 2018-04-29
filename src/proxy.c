@@ -295,7 +295,6 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
     if (res == FAILURE) {
         if (verbose)
             perror("send_response: failed to write response buffer");
-		send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 
@@ -327,8 +326,10 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
                 // XXX: should we retry?
                 if (verbose)
                     fprintf(stderr,
-                            "proxy_send_response: expected %lu more bytes, found 0",
+                            "proxy_send_response: expected %lu more bytes, found 0\n",
                             remaining);
+				// Timeout for now until we decide if we want to retry
+				send_error(proxy, TIMEOUT);
                 res = FAILURE;
                 break;
             }
@@ -338,7 +339,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
                 break;
             }
 
-            n = res;
+			n = res;
 
             // Move a chunk of data from the pipe to the client socket.
             // We won't necessarily get to write the full chunk in one go,
@@ -357,10 +358,17 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
                     break;
                 }
 
-                n -= res1;
-            } while (n);
+				n -= res1;
 
-            if (res == FAILURE)
+				if(n < 0) {
+					if(verbose)
+						fputs("proxy_send_response: timeout", stderr);
+					send_error(proxy, TIMEOUT);
+				}
+
+			} while (n);
+
+			if (res == FAILURE)
                 break; // The inner loop failed, break out of the outer loop.
 
             remaining -= res;

@@ -123,7 +123,8 @@ void debug_http_header_field(struct http_header_field);
  * Status Code
  */
 
-enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, BAD_GATEWAY, TIMEOUT, STATUS_COUNT };
+enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, BAD_GATEWAY,
+						TIMEOUT, STATUS_COUNT };
 
 /*
  * Error 

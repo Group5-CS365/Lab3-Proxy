@@ -59,10 +59,10 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_test_case response2
 response2_head() {
-    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
+	base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
 }
 response2_body() {
-    printf > test.in "\
+	    printf > test.in "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -77,16 +77,35 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-    echo "TODO: 504 response" > test.ok
+	printf > test.ok "\
+HTTP/1.1 404 Not Found\r
+Date: Sat, 21 Apr 2018 02:24:10 GMT\r
+Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
+Content-Length: 2147483648\r
+Content-Type: text/html; charset=iso-8859-1\r
+\r
+<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL /index.html was not found on this server.</p>
+</body></html>
+HTTP/1.0 504 Gateway Timeout\r
+Content-Type: text/plain\r
+Content-Length: 33\r
+\r
+The server response took too long"
+	
     base_body
 }
 
 atf_test_case response3
 response3_head() {
-    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
+	base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
 }
 response3_body() {
-    printf > test.in "\
+	    printf > test.in "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -101,7 +120,26 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-    echo "TODO: 504 response" > test.ok
+	printf > test.ok "\
+HTTP/1.1 404 Not Found\r
+Date: Sat, 21 Apr 2018 02:24:10 GMT\r
+Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
+Content-Length: 2147483647\r
+Content-Type: text/html; charset=iso-8859-1\r
+\r
+<!DOCTYPE HTML PUBLIC \"-//IETF//DTD HTML 2.0//EN\">
+<html><head>
+<title>404 Not Found</title>
+</head><body>
+<h1>Not Found</h1>
+<p>The requested URL /index.html was not found on this server.</p>
+</body></html>
+HTTP/1.0 504 Gateway Timeout\r
+Content-Type: text/plain\r
+Content-Length: 33\r
+\r
+The server response took too long"
+	
     base_body
 }
 
