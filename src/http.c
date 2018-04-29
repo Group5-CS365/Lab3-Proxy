@@ -32,6 +32,20 @@
 #include <stdio.h>
 #include <string.h>
 
+#define HTTP_ERROR(status, reason, reasonlen, body, bodylen, bodylenlen) \
+	{ { #status, 3 }, { reason, reasonlen }, { #bodylen, bodylenlen }, { body, bodylen } }
+
+struct http_error const http_errors[STATUS_COUNT] = {
+	HTTP_ERROR(400, "Bad Request", 11,
+				  "The client request is invalid", 29, 2),
+	HTTP_ERROR(500, "Internal Server Error", 21,
+				  "The proxy encountered an unexpected condition", 45, 2),
+	HTTP_ERROR(502, "Bad Gateway", 11,
+				  "The response from the server is invalid", 39, 2),	
+    HTTP_ERROR(504, "Gateway Timeout", 15,
+				  "The server response took too long", 33, 2),
+};
+
 /*
  * Request Line
  */
@@ -158,7 +172,6 @@ parse_http_status_line(char *buf, size_t len)
     char *p = buf, *end = buf + len;
     struct http_status_line line = { .end = end };
 
-    /************************ NOT SURE IF THIS IS NEEDED *********************/
     // Consume leading CRLFs.
     // https://tools.ietf.org/html/rfc7230#section-3.5
     while (p != end && memchr(crlf, *p, crlflen) != NULL)
@@ -169,7 +182,6 @@ parse_http_status_line(char *buf, size_t len)
         fputs("warning: invalid response line (empty)\n", stderr);
         return line;
     }
-    /********************************** END *********************************/
 
     // HTTP version
     line.http_version.p = p;
@@ -224,7 +236,6 @@ parse_http_status_line(char *buf, size_t len)
         return line;
     }
 
-    /************************ NOT SURE IF THIS IS NEEDED *********************/
     // LF (already consumed CR)
     if (*p != '\n') {
         fputs("warning: invalid response line (missing LF)\n", stderr);
@@ -234,8 +245,7 @@ parse_http_status_line(char *buf, size_t len)
         fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
         return line;
     }
-    /********************************** END *********************************/
-
+	
     line.valid = true;
     line.end = p + 1;
 

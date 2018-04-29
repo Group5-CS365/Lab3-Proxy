@@ -164,7 +164,11 @@ User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
 "
-    echo "400: Bad Request - The client request is invalid" > test.ok
+    printf > test.ok "HTTP/1.1 400 Bad Request\r
+Content-Type: text/plain\r
+Content-Length: 29\r
+\r
+The client request is invalid" 
 
     error_body
 }
@@ -186,7 +190,11 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf "400: Bad Request - The client request is invalid" > test.ok
+    printf > test.ok "HTTP/1.1 400 Bad Request\r
+Content-Type: text/plain\r
+Content-Length: 29\r
+\r
+The client request is invalid"
 
     error_body
 }
@@ -208,7 +216,11 @@ Accept: */*\r
 Proxy-Connection: Keep-Alive\r
 \r
 "
-    printf "400: Bad Request - The client request is invalid" > test.ok
+    printf > test.ok "HTTP/1.1 400 Bad Request\r
+Content-Type: text/plain\r
+Content-Length: 29\r
+\r
+The client request is invalid"
 
     error_body
 }

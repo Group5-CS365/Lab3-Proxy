@@ -79,34 +79,6 @@ struct proxy {
     struct sockaddr_in client_addr;
 };
 
-struct http_error errors[] = {
-	{
-		{ "400: ", 5 },
-		{ "Bad Request - ", 14 },
-		{ "The client request is invalid", 29 }
-	},
-	{
-		{ "500: ", 5 },
-		{ "Internal Server Error - ", 24 },
-		{ "The proxy encountered an unexpected condition", 45 }
-	},
-	{
-		{ "501: ", 5 },
-		{ "Not Implemented - ", 18 },
-		{ "The proxy does not recognize the request method", 47 }
-	},
-	{
-		{ "502: ", 5 },
-		{ "Bad Gateway - ", 14 },
-		{ "The response from the server is invalid", 39 }
-	},
-	{
-		{ "504: ", 5 },
-		{ "Gateway Timeout - ", 18 },
-		{ "The server response took too long", 33 }
-	}
-};
-
 /*
  * Initialize a proxy data structure and start listening.
  */
@@ -220,26 +192,38 @@ connect_server(char *host, char *port)
  */
 static ssize_t
 send_error(struct proxy *proxy, enum http_status_code status) {
-    struct iovec parts[] = {
-        { // Version
-            .iov_base = "HTTP/1.1 ",
-            .iov_len = 9
-        },
-        { // Status
-            .iov_base = errors[status].status.p,
-            .iov_len = errors[status].status.len
-        },
-        { // Reason
-            .iov_base = errors[status].reason.p,
-            .iov_len = errors[status].reason.len
-        },
-        { // Body
-            .iov_base = errors[status].body.p,
-            .iov_len = errors[status].body.len
-        },
-    };
+	
+ 	struct iovec parts[] = {
+		{ // Version
+			.iov_base = "HTTP/1.1 ",
+			.iov_len = 9
+		},
+		// Status
+		IOSTRING_TO_IOVEC(http_errors[status].status),
 
-    return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
+		{ // ws
+			.iov_base = " ",
+			.iov_len = 1
+		},
+		// Reason
+		IOSTRING_TO_IOVEC(http_errors[status].reason),
+
+		{ // Content Type and Content Length name
+			.iov_base = "\r\nContent-Type: text/plain\r\nContent-Length: ",
+			.iov_len = 44
+		},
+		// Content-Length
+		IOSTRING_TO_IOVEC (http_errors[status].content_length),
+
+		{ // Carriage return and Newline
+			.iov_base = "\r\n\r\n",
+			.iov_len = 4
+		},
+		// Body
+		IOSTRING_TO_IOVEC(http_errors[status].body)	
+	};
+
+	return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
 /*
@@ -309,6 +293,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
     if (res == FAILURE) {
         if (verbose)
             perror("send_response: failed to write response buffer");
+		send_error(proxy, INTERNAL_ERROR);
         return FAILURE;
     }
 
@@ -441,7 +426,7 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
  */
 static ssize_t
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
-{
+{ 
     char const * const end = buf + len;
     ssize_t content_length = 0;
     struct http_status_line statline = parse_http_status_line(buf, len);
@@ -483,6 +468,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     // Skip over CRLF.
     n -= 2;
     p += 2;
+
     if (p > end) {
         if (verbose)
             fputs("malformed response (too short)\n", stderr);
@@ -517,7 +503,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
  */
 static ssize_t
 proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
-{
+{ 
     bool const verbose = proxy->verbose;
     char const * const end = buf + len;
     struct http_request_line reqline = parse_http_request_line(buf, len);
@@ -557,7 +543,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
                         field.field_name.p, field.field_name.len) == SUCCESS)
             proxyconn = field;
     }
-
+	
     // Skip over CRLF.
     n -= 2;
     p += 2;

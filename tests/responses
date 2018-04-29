@@ -18,6 +18,7 @@ base_head() {
     atf_set "descr" \
             "${1:-A given response produces the expected response at the client}"
 }
+
 base_body() {
     nc -l ${SERVER_PORT} < test.in &
     proxy -v ${PROXY_PORT} &
@@ -226,6 +227,8 @@ atf_init_test_cases() {
     atf_add_test_case response2
     atf_add_test_case response3
     atf_add_test_case response4
+	atf_add_test_case response5
+	atf_add_test_case response6
 }
 
 # Local Variables:

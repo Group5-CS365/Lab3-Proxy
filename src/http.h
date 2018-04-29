@@ -123,15 +123,13 @@ void debug_http_header_field(struct http_header_field);
  * Status Code
  */
 
-enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, NOT_IMPLEMENTED,
-						BAD_GATEWAY, TIMEOUT };
+enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, BAD_GATEWAY, TIMEOUT, STATUS_COUNT };
 
 /*
  * Error 
  */
-
 struct http_error {
-	struct iostring status, reason, body;
-};
+	struct iostring status, reason, content_length, body;
+} const http_errors[STATUS_COUNT];
 
 #endif // _http_h_

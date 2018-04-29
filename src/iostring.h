@@ -30,6 +30,8 @@
 #ifndef _iostring_h_
 #define _iostring_h_
 
+#define IOSTRING_TO_IOVEC(s) { .iov_base = (s).p, .iov_len = (s).len }
+
 #include <stdlib.h>
 
 
