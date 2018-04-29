@@ -1,0 +1,210 @@
+#! /usr/bin/env atf-sh
+
+SERVER_HOST=localhost
+SERVER_PORT=2345
+SERVER=${SERVER_HOST}:${SERVER_PORT}
+
+PROXY_HOST=localhost
+PROXY_PORT=5432
+PROXY=${PROXY_HOST}:${PROXY_PORT}
+
+bad_request() {
+    printf "\
+HTTP/1.0 400 Bad Request\r
+Content-Type: text/plain\r
+Content-Length: 29\r
+\r
+The client request is invalid"
+}
+
+timeout() {
+    printf "\
+HTTP/1.0 504 Gateway Timeout\r
+Content-Type: text/plain\r
+Content-Length: 33\r
+\r
+The server response took too long"
+}
+
+bad_gateway() {
+    printf "\
+HTTP/1.0 502 Bad Gateway\r
+Content-Type: text/plain\r
+Content-Length: 39\r
+\r
+The response from the server is invalid"
+}
+
+dummy_request() {
+    printf "\
+GET http://${SERVER}/ HTTP/1.0\r
+Host: ${SERVER}\r
+\r
+"
+}
+
+base_head() {
+    atf_set "require.progs" "diff hexdump nc printf proxy"
+    atf_set "descr" ${1:-"A given request produces the expected" \
+                         "error response"}
+}
+request_body() {
+    proxy -v ${PROXY_PORT} &
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in > test.out
+
+    echo "expected response:"
+    hexdump -C test.ok
+    echo "actual response:"
+    hexdump -C test.out
+
+    diff -u test.ok test.out \
+        || atf_fail "Actual response did not match expected"
+}
+response_body() {
+    nc -l ${SERVER_HOST} ${SERVER_PORT} < test.in &
+    proxy -v ${PROXY_PORT} &
+    dummy_request | nc ${PROXY_HOST} ${PROXY_PORT} > test.out
+
+    echo "expected response:"
+    hexdump -C test.ok
+    echo "actual response:"
+    hexdump -C test.out
+
+    diff -u test.ok test.out \
+        || atf_fail "Actual response did not match expected"
+}
+
+atf_test_case error1
+error1_head() {
+    base_head "Bad request with target URI not in absolute-form"
+}
+error1_body() {
+    printf > test.in "\
+GET / HTTP/1.1\r
+Proxy-Connection: Keep-Alive\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+\r
+"
+    bad_request > test.ok
+    request_body
+}
+
+atf_test_case error2
+error2_head() {
+    base_head "Bad request with whitespace in the version field"
+}
+error2_body() {
+    printf > test.in "\
+GET http://${SERVER}/ HTTP 1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    bad_request > test.ok
+    request_body
+}
+
+atf_test_case error3
+error3_head() {
+    base_head "Bad request with a malformed URI"
+}
+error3_body() {
+    printf > test.in "\
+GET htp://${SERVER_HOST}:/ HTTP 1.1\r
+Host: ${SERVER}\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    bad_request > test.ok
+    request_body
+}
+
+atf_test_case error4
+error4_head() {
+    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
+}
+error4_body() {
+    printf > test.in "\
+HTTP/1.1 200 OK\r
+Content-Length: 2147483647\r
+\r
+this is nowhere near enough data
+"
+    timeout > test.ok
+    response_body
+}
+
+atf_test_case error5
+error5_head() {
+    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
+}
+error5_body() {
+    printf > test.in "\
+HTTP/1.1 200 OK\r
+Content-Length: 2147483647\r
+\r
+this is nowhere near enough data
+"
+    timeout > test.ok
+    response_body
+}
+
+atf_test_case error6
+error6_head() {
+    base_head "Bad gateway when the server's response is incomplete"
+}
+error6_body() {
+    printf > test.in "\
+HTTP/1.1 200 OK\r
+Content-Length: 208\r
+"
+    bad_gateway > test.ok
+    response_body
+}
+
+atf_test_case error7
+error7_head() {
+    base_head "Bad gateway when the server responds with an invalid status line"
+}
+error7_body() {
+    echo > test.in
+    bad_gateway > test.ok
+    response_body
+}
+
+atf_test_case error8
+error8_head() {
+    base_head "Bad gateway when the server responds with too much data"
+}
+error8_body() {
+    printf > test.in "\
+HTTP/1.0 200 OK\r
+Content-Length: 10\r
+\r
+this is way too much data
+"
+    bad_gateway > test.ok
+    response_body
+}
+
+atf_init_test_cases() {
+    atf_add_test_case error1
+    atf_add_test_case error2
+    atf_add_test_case error3
+    atf_add_test_case error4
+    atf_add_test_case error5
+    atf_add_test_case error6
+    atf_add_test_case error7
+    atf_add_test_case error8
+}
+
+# Local Variables:
+# mode: sh
+# End:
+# vim: filetype=sh fileformat=unix
