@@ -494,12 +494,12 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 static ssize_t
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
 {
-	char const * const end = buf + len;
-	ssize_t content_length = 0;
-	struct http_status_line statline = parse_http_status_line(buf, len);
-	char *p = buf;
-	size_t n = len, more = 0;
-	bool const verbose = proxy->verbose;
+    char const * const end = buf + len;
+    ssize_t content_length = 0;
+    struct http_status_line statline = parse_http_status_line(buf, len);
+    char *p = buf;
+    size_t n = len, more = 0;
+    bool const verbose = proxy->verbose;
 
     if (verbose)
         debug_http_status_line(statline);
@@ -507,7 +507,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (!statline.valid) {
         if (verbose)
             fputs("malformed response (invalid status line)\n", stderr);
-		send_error(proxy, BAD_GATEWAY); 
+        send_error(proxy, BAD_GATEWAY);
         return FAILURE;
     }
 
@@ -710,7 +710,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive request");
-			// TODO: Add 500 Internal Error
+            // TODO: Add 500 Internal Error
             res = EXIT_FAILURE;
             break;
         }
@@ -740,7 +740,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive response");
-			// TODO: Add 500 Internal Error
+            // TODO: Add 500 Internal Error
             res = EXIT_FAILURE;
             break;
         }

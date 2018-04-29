@@ -59,10 +59,10 @@ Content-Type: text/html; charset=iso-8859-1\r
 
 atf_test_case response2
 response2_head() {
-	base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
+    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
 }
 response2_body() {
-	    printf > test.in "\
+    printf > test.in "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -77,7 +77,7 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-	printf > test.ok "\
+    printf > test.ok "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -96,16 +96,15 @@ Content-Type: text/plain\r
 Content-Length: 33\r
 \r
 The server response took too long"
-	
     base_body
 }
 
 atf_test_case response3
 response3_head() {
-	base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
+    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
 }
 response3_body() {
-	    printf > test.in "\
+    printf > test.in "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -120,7 +119,7 @@ Content-Type: text/html; charset=iso-8859-1\r
 <p>The requested URL /index.html was not found on this server.</p>
 </body></html>
 "
-	printf > test.ok "\
+    printf > test.ok "\
 HTTP/1.1 404 Not Found\r
 Date: Sat, 21 Apr 2018 02:24:10 GMT\r
 Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
@@ -139,7 +138,7 @@ Content-Type: text/plain\r
 Content-Length: 33\r
 \r
 The server response took too long"
-	
+
     base_body
 }
 
@@ -214,14 +213,14 @@ Server: Apache/2.4.18 (Fedora) OpenSSL/1.0.1k-fips\r
 Content-Length: 208\r
 Content-Type: text/html; charset=iso-8859-1\r
 "
-	printf > test.ok "\
+    printf > test.ok "\
 HTTP/1.0 502 Bad Gateway\r
 Content-Type: text/plain\r
 Content-Length: 39\r
 \r
 The response from the server is invalid"
 
-	base_body
+    base_body
 }
 
 atf_test_case response6
@@ -239,7 +238,7 @@ Content-Length: 39\r
 \r
 The response from the server is invalid"
 
-	base_body
+    base_body
 }
 
 atf_test_case response
@@ -250,14 +249,14 @@ response7_body() {
     printf > test.in "\
 HTTP/1.1
 "
-	printf > test.ok "\
+    printf > test.ok "\
 HTTP/1.0 502 Bad Gateway\r
 Content-Type: text/plain\r
 Content-Length: 39\r
 \r
 The response from the server is invalid"
 
-	base_body
+    base_body
 }
 
 atf_init_test_cases() {
@@ -265,8 +264,8 @@ atf_init_test_cases() {
     atf_add_test_case response2
     atf_add_test_case response3
     atf_add_test_case response4
-	atf_add_test_case response5
-	atf_add_test_case response6
+    atf_add_test_case response5
+    atf_add_test_case response6
 }
 
 # Local Variables:

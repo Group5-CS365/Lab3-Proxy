@@ -36,7 +36,7 @@ error_body() {
     echo "actual response:"
     hexdump -C test.out
 
-	diff -u test.ok test.out \
+    diff -u test.ok test.out \
         || atf_fail "Actual request did not match expected"
 }
 
@@ -172,7 +172,7 @@ Content-Length: 29\r
 \r
 The client request is invalid"
 
-	error_body
+    error_body
 }
 
 atf_test_case request7
@@ -199,7 +199,7 @@ Content-Length: 29\r
 \r
 The client request is invalid"
 
-	error_body
+    error_body
 }
 
 atf_test_case request8
@@ -226,7 +226,7 @@ Content-Length: 29\r
 \r
 The client request is invalid"
 
-	error_body
+    error_body
 }
 
 atf_test_case request9
