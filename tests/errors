@@ -127,7 +127,7 @@ Proxy-Connection: Keep-Alive\r
 
 atf_test_case error4
 error4_head() {
-    base_head "Timeout waiting for INT_MAX+1 bytes from server -> 504 response"
+    base_head "Connection closed waiting for INT_MAX+1 bytes from server"
 }
 error4_body() {
     printf > test.in "\
@@ -136,13 +136,13 @@ Content-Length: 2147483647\r
 \r
 this is nowhere near enough data
 "
-    timeout > test.ok
+    cp test.in test.ok
     response_body
 }
 
 atf_test_case error5
 error5_head() {
-    base_head "Timeout waiting for INT_MAX bytes from server -> 504 response"
+    base_head "Connection closed waiting for INT_MAX bytes from server"
 }
 error5_body() {
     printf > test.in "\
@@ -151,7 +151,7 @@ Content-Length: 2147483647\r
 \r
 this is nowhere near enough data
 "
-    timeout > test.ok
+    cp test.in test.ok
     response_body
 }
 

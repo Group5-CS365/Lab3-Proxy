@@ -89,7 +89,7 @@ User-Agent: curl/7.54.0\r
 Accept: */*\r
 \r
 "
-    echo -n > test.ok
+    touch test.ok
     base_body
 }
 
@@ -141,7 +141,7 @@ Accept: */*\r
 
 atf_test_case request6
 request6_head() {
-    atf_set "require.progs" "dd diff hexdump nc printf proxy sed"
+    atf_set "require.progs" "dd diff hexdump nc printf proxy sed tee"
     atf_set "descr" "Large request body"
 }
 request6_body() {
@@ -154,8 +154,10 @@ Content-Type: application/octet-stream\r
 Content-Length: ${content_length}\r
 \r
 "
-    dd if=/dev/zero bs=${content_length} count=1 >> test.in
     sed "s#http://${SERVER}##" test.in > test.ok
+    dd if=/dev/zero of=test.data bs=${content_length} count=1
+    cat test.data >> test.in
+    cat test.data >> test.ok
     base_body
 }
 
