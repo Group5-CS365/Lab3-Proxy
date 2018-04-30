@@ -191,7 +191,7 @@ connect_server(char *host, char *port)
  * Send an error response with a given status and reason on the socket fd.
  */
 static ssize_t
-send_error(struct proxy *proxy, enum http_status_code status)
+send_error(int client_fd, enum http_status_code status)
 {
     struct iovec parts[] = {
         { // Version
@@ -223,8 +223,7 @@ send_error(struct proxy *proxy, enum http_status_code status)
         IOSTRING_TO_IOVEC(http_errors[status].body)
     };
 
-    // TODO: Add 500 Error
-    return writev(proxy->client_fd, parts, sizeof parts / sizeof (struct iovec));
+    return writev(client_fd, parts, sizeof parts / sizeof (struct iovec));
 }
 
 enum {
@@ -494,12 +493,14 @@ proxy_send_response(struct proxy *proxy, char *buf, size_t len, size_t more)
 static ssize_t
 proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
 {
+    bool const verbose = proxy->verbose;
+    int const client_fd = proxy->client_fd;
+
     char const * const end = buf + len;
     ssize_t content_length = 0;
     struct http_status_line statline = parse_http_status_line(buf, len);
     char *p = buf;
     size_t n = len, more = 0;
-    bool const verbose = proxy->verbose;
 
     if (verbose)
         debug_http_status_line(statline);
@@ -507,7 +508,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (!statline.valid) {
         if (verbose)
             fputs("malformed response (invalid status line)\n", stderr);
-        send_error(proxy, BAD_GATEWAY);
+        send_error(client_fd, BAD_GATEWAY);
         return FAILURE;
     }
 
@@ -538,14 +539,14 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
     if (p > end) {
         if (verbose)
             fputs("malformed response (too short)\n", stderr);
-        send_error(proxy, BAD_GATEWAY);
+        send_error(client_fd, BAD_GATEWAY);
         return FAILURE;
     }
 
     if (content_length < n) {
         if (verbose)
             fputs("malformed response (extra data)\n", stderr);
-        send_error(proxy, BAD_GATEWAY);
+        send_error(client_fd, BAD_GATEWAY);
         return FAILURE;
     }
 
@@ -570,6 +571,8 @@ static ssize_t
 proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 {
     bool const verbose = proxy->verbose;
+    int const client_fd = proxy->client_fd;
+
     char const * const end = buf + len;
     ssize_t content_length = 0;
     struct http_request_line reqline = parse_http_request_line(buf, len);
@@ -586,7 +589,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (!reqline.valid) {
         if(verbose)
             fputs("malformed request (invalid request line)\n", stderr);
-        send_error(proxy, BAD_REQUEST);
+        send_error(client_fd, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -620,14 +623,14 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
-        send_error(proxy, BAD_REQUEST);
+        send_error(client_fd, BAD_REQUEST);
         return FAILURE;
     }
 
     if (content_length < n) {
         if (verbose)
             fputs("malformed request (extra data)\n", stderr);
-        send_error(proxy, BAD_REQUEST);
+        send_error(client_fd, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -642,7 +645,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     if (!uri.valid) {
         if (verbose)
             fputs("malformed request (invalid URI)\n", stderr);
-        send_error(proxy, BAD_REQUEST);
+        send_error(client_fd, BAD_REQUEST);
         return FAILURE;
     }
 
@@ -658,8 +661,10 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
 
     fd = connect_server(host.p, port.p);
     if (fd == FAILURE) {
-        fputs("proxy_handle_request(): failed to connect to server\n", stderr);
-        send_error(proxy, INTERNAL_ERROR);
+        if (verbose)
+            fputs("proxy_handle_request(): failed to connect to server\n",
+                  stderr);
+        send_error(client_fd, INTERNAL_ERROR);
         return FAILURE;
     }
 
@@ -678,7 +683,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
                            more) == FAILURE) {
         if (verbose)
             perror("failed to send request");
-        send_error(proxy, INTERNAL_ERROR);
+        send_error(client_fd, INTERNAL_ERROR);
         return FAILURE;
     }
 
