@@ -1,0 +1,116 @@
+#! /usr/bin/env atf-sh
+
+SERVER_HOST=localhost
+SERVER_PORT=2345
+SERVER=${SERVER_HOST}:${SERVER_PORT}
+
+PROXY_HOST=localhost
+PROXY_PORT=5432
+PROXY=${PROXY_HOST}:${PROXY_PORT}
+
+base_head() {
+    atf_set "require.progs" "diff hexdump nc printf proxy"
+    atf_set "descr" ${1:-"A given test produces the expected result"}
+}
+base_body() {
+    nc -l ${SERVER_PORT} > test.out &
+    proxy -v ${PROXY_PORT} &
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in
+
+    echo "expected result:"
+    hexdump -C test.ok
+    echo "actual result:"
+    hexdump -C test.out
+
+    diff -u test.ok test.out \
+        || atf_fail "Actual result did not match expected"
+}
+
+# Builds - Maybe redundant because of Travis?
+atf_test_case validation1
+validation1_head() {
+    base_head "Build test"
+}
+validation1_body() {
+    atf_fail "test not implemented"
+}
+
+# Command Line Arguments
+atf_test_case validation2
+validation2_head() {
+    base_head "Support of command line arguments --help and --verbose"
+}
+validation2_body() {
+    atf_fail "test not implemented"
+}
+
+# Silent
+atf_test_case validation3
+validation3_head() {
+    base_head "Proxy runs silent by default"
+}
+validation3_body() {
+    atf_fail "test not implemented"
+}
+
+# Server Architecture - Other parts of this might be handled by existing tests
+atf_test_case validation4
+validation4_head() {
+    base_head "Proxy forks on each client connection and leaves no zombies"
+}
+validation4_body() {
+    atf_fail "test not implemented"
+}
+
+# Client Support
+atf_test_case validation5
+validation5_head() {
+    base_head "Proxy supports at least wget and lynx"
+}
+validation5_body() {
+    atf_fail "test not implemented"
+}
+
+# Basic Functionality -  Not sure about this one?
+atf_test_case validation6
+validation6_head() {
+    base_head "Test the functionality of the proxy using existing tests"
+}
+validation6_body() {
+    atf_fail "test not implemented"
+}
+
+# Error Checking - Not sure how to test this (at minimum all syscalls need
+#                  error checking)
+atf_test_case validation7
+validation7_head() {
+    base_head "Test error checking"
+}
+validation7_body() {
+    atf_fail "test not implemented"
+}
+
+# Testing via Valgrind - Not sure we need this here but it might be nice
+atf_test_case validation8
+validation8_head() {
+    base_head "Test for memory leaks using Valgrind"
+}
+validation8_body() {
+    atf_fail "test not implemented"
+}
+
+atf_init_test_cases() {
+    atf_add_test_case validation1
+    atf_add_test_case validation2
+    atf_add_test_case validation3
+    atf_add_test_case validation4
+    atf_add_test_case validation5
+    atf_add_test_case validation6
+    atf_add_test_case validation7
+    atf_add_test_case validation8
+}
+
+# Local Variables:
+# mode: sh
+# End:
+# vim: filetype=sh fileformat=unix
