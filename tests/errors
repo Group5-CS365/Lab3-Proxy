@@ -17,6 +17,15 @@ Content-Length: 29\r
 The client request is invalid"
 }
 
+internal_error() {
+    printf "\
+HTTP/1.0 500 Internal Server Error\r
+Content-Type: text/plain\r
+Content-Length: 45\r
+\r
+The proxy encountered an unexpected condition"
+}
+
 timeout() {
     printf "\
 HTTP/1.0 504 Gateway Timeout\r
@@ -193,6 +202,23 @@ this is way too much data
     response_body
 }
 
+atf_test_case error9
+error9_head() {
+    base_head "Internal server error due to bad host name"
+}
+error9_body() {
+    printf > test.in "\
+GET http://${SERVER}/ HTTP/1.1\r
+Host: \r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    internal_error > test.ok
+    request_body
+}
+
 atf_init_test_cases() {
     atf_add_test_case error1
     atf_add_test_case error2
@@ -202,6 +228,7 @@ atf_init_test_cases() {
     atf_add_test_case error6
     atf_add_test_case error7
     atf_add_test_case error8
+    atf_add_test_case error9
 }
 
 # Local Variables:
