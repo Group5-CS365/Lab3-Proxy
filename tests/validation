@@ -1,11 +1,11 @@
 #! /usr/bin/env atf-sh
 
 SERVER_HOST=localhost
-SERVER_PORT=2345
+SERVER_PORT=1234
 SERVER=${SERVER_HOST}:${SERVER_PORT}
 
 PROXY_HOST=localhost
-PROXY_PORT=5432
+PROXY_PORT=4321
 PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 base_head() {
@@ -42,12 +42,12 @@ validation2_body() {
   OPTIONS:\n\t-h, --help, to display this usage message\n\t-v, --verbose, for verbose output
 "
     echo "Testing --help"
-    proxy --help ${PROXY_PORT} 2> test.out
+    proxy --help ${PROXY_PORT} > test.out
     base_body
 
     echo ""
     echo "Testing -h"
-    proxy -h ${PROXY_PORT} 2> test.out
+    proxy -h ${PROXY_PORT} > test.out
     base_body
 }
 
@@ -57,7 +57,20 @@ validation3_head() {
     base_head "Support of command line arguments --verbose and -v"
 }
 validation3_body() {
-    atf_fail "test not implemented"
+    printf > test.ok "listening on port ${PROXY_PORT}
+"
+    echo "Testing --verbose"       
+    proxy --verbose ${PROXY_PORT} 2> test.out &
+    sleep 1
+    kill %1 && wait %1
+    base_body
+
+    echo ""
+    echo "Testing -v"       
+    proxy -v ${PROXY_PORT} 2> test.out &
+    sleep 1
+    kill %1 && wait %1
+    base_body
 }
 
 # Silent

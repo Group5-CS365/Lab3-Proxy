@@ -121,9 +121,11 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
     }
 
     if (verbose)
-        printf("listening on port %d\n", port);
+	fprintf(stderr, "listening on port %d\n", port);
 
     proxy->listen_fd = fd;
+
+    // Does this force verbosity for debugging?
     proxy->verbose = verbose;
 
     return SUCCESS;
