@@ -77,14 +77,51 @@ validation5_head() {
 validation5_body() {
     atf_fail "test not implemented"
 }
-
-# Client Support
+ 
+# Client Support - wget
 atf_test_case validation6
 validation6_head() {
-    base_head "Proxy supports at least wget and lynx"
+    base_head "Proxy supports at least wget"
 }
 validation6_body() {
-    atf_fail "test not implemented"
+    nc -l ${SERVER_PORT} > test.out &
+    proxy -v ${PROXY_PORT} &
+    env http_proxy=http://blue.cs.sonoma.edu:${PROXY_PORT}
+    wget http://${SERVER}
+
+    printf > test.ok "\
+GET / HTTP/1.1\r
+User-Agent: Wget/1.18 (linux-gnu)\r
+Accept: */*\r
+Accept-Encoding: identity\r
+Host: localhost:2345\r
+Connection: Keep-Alive\r
+\r
+"
+    base_body
+}
+
+# Client Support - lynx
+atf_test_case validation6_1
+validation6_1_head() {
+    base_head "Proxy supports at least lynx"
+}
+validation6_1_body() {
+    nc -l ${SERVER_PORT} > test.out &
+    proxy -v ${PROXY_PORT} &
+    env http_proxy=http://blue.cs.sonoma.edu:${PROXY_PORT}
+    lynx http://${SERVER}
+
+    printf > test.ok "\
+GET / HTTP/1.0\r
+Host: localhost:${SERVER_PORT}\r
+Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
+Accept-Encoding: gzip, bzip2\r
+Accept-Language: en\r
+User-Agent: Lynx/2.8.9dev.4 libwww-FM/2.14 SSL-MM/1.4.1 OpenSSL/1.0.1k-fips\r
+\r
+"
+    base_body
 }
 
 # Basic Functionality -  Not sure about this one?
@@ -122,6 +159,7 @@ atf_init_test_cases() {
     atf_add_test_case validation4
     atf_add_test_case validation5
     atf_add_test_case validation6
+    atf_add_test_case validation6_1
     atf_add_test_case validation7
     atf_add_test_case validation8
     atf_add_test_case validation9
