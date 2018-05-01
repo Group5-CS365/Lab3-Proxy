@@ -13,9 +13,6 @@ base_head() {
     atf_set "descr" ${1:-"A given test produces the expected result"}
 }
 base_body() {
-    nc -l ${SERVER_PORT} > test.out &
-    proxy -v ${PROXY_PORT} &
-    nc ${PROXY_HOST} ${PROXY_PORT} < test.in
 
     echo "expected result:"
     hexdump -C test.ok
@@ -35,67 +32,86 @@ validation1_body() {
     atf_fail "test not implemented"
 }
 
-# Command Line Arguments
+# Command Line Arguments --help and -h
 atf_test_case validation2
 validation2_head() {
-    base_head "Support of command line arguments --help and --verbose"
+    base_head "Support of command line arguments --help and -h"
 }
 validation2_body() {
-    atf_fail "test not implemented"
+	printf > test.ok "usage: proxy [OPTIONS] PORT, where
+  OPTIONS:\n\t-h, --help, to display this usage message\n\t-v, --verbose, for verbose output
+"
+    echo "Testing --help"
+    proxy --help ${PROXY_PORT} 2> test.out
+    base_body
+
+    echo ""
+    echo "Testing -h"
+    proxy -h ${PROXY_PORT} 2> test.out
+    base_body
 }
 
-# Silent
+# Command Line Arguments --verbose and -v
 atf_test_case validation3
 validation3_head() {
-    base_head "Proxy runs silent by default"
+    base_head "Support of command line arguments --verbose and -v"
 }
 validation3_body() {
     atf_fail "test not implemented"
 }
 
-# Server Architecture - Other parts of this might be handled by existing tests
+# Silent
 atf_test_case validation4
 validation4_head() {
-    base_head "Proxy forks on each client connection and leaves no zombies"
+    base_head "Proxy runs silent by default"
 }
 validation4_body() {
     atf_fail "test not implemented"
 }
 
-# Client Support
+# Server Architecture - Other parts of this might be handled by existing tests
 atf_test_case validation5
 validation5_head() {
-    base_head "Proxy supports at least wget and lynx"
+    base_head "Proxy forks on each client connection and leaves no zombies"
 }
 validation5_body() {
     atf_fail "test not implemented"
 }
 
-# Basic Functionality -  Not sure about this one?
+# Client Support
 atf_test_case validation6
 validation6_head() {
-    base_head "Test the functionality of the proxy using existing tests"
+    base_head "Proxy supports at least wget and lynx"
 }
 validation6_body() {
     atf_fail "test not implemented"
 }
 
-# Error Checking - Not sure how to test this (at minimum all syscalls need
-#                  error checking)
+# Basic Functionality -  Not sure about this one?
 atf_test_case validation7
 validation7_head() {
-    base_head "Test error checking"
+    base_head "Test the functionality of the proxy using existing tests"
 }
 validation7_body() {
     atf_fail "test not implemented"
 }
 
-# Testing via Valgrind - Not sure we need this here but it might be nice
+# Error Checking - Not sure how to test this (at minimum all syscalls need
+#                  error checking)
 atf_test_case validation8
 validation8_head() {
-    base_head "Test for memory leaks using Valgrind"
+    base_head "Test error checking"
 }
 validation8_body() {
+    atf_fail "test not implemented"
+}
+
+# Testing via Valgrind - Not sure we need this here but it might be nice
+atf_test_case validation9
+validation9_head() {
+    base_head "Test for memory leaks using Valgrind"
+}
+validation9_body() {
     atf_fail "test not implemented"
 }
 
@@ -108,6 +124,7 @@ atf_init_test_cases() {
     atf_add_test_case validation6
     atf_add_test_case validation7
     atf_add_test_case validation8
+    atf_add_test_case validation9
 }
 
 # Local Variables:
