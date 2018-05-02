@@ -137,13 +137,13 @@ proxy_cleanup(struct proxy *proxy)
     bool const verbose = proxy->verbose;
 
     if (verbose)
-        puts("waiting for children");
+	fprintf(stderr, "waiting for children");
 
     while (wait(NULL) != FAILURE)
         ;
 
     if (verbose)
-        puts("closing socket fds");
+	fprintf(stderr, "closing socket fds");
 
     close(proxy->listen_fd);
     close(proxy->client_fd);
@@ -797,7 +797,7 @@ proxy_accept(struct proxy *proxy)
     }
 
     if (proxy->verbose)
-        puts("accepted a connection");
+	fprintf(stderr, "accepted a connection");
 
     switch (fork()) {
     case -1:
