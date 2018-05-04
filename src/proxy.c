@@ -667,7 +667,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         send_error(client_fd, INTERNAL_ERROR);
         return FAILURE;
     }
-    struct timeval timeout = {5, 0};
+	struct timeval timeout = {5, 0};
     
     proxy->server_fd = fd;
 
@@ -800,9 +800,6 @@ proxy_accept(struct proxy *proxy)
 
     if (proxy->verbose) {
         puts("accepted a connection");
-	setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&time, sizeof (struct timeval));
-    }
-//    setsockopt(proxy->listen_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&time, sizeof (struct timeval));
 	
     switch (fork()) {
     case -1:
@@ -812,14 +809,14 @@ proxy_accept(struct proxy *proxy)
     case 0:
         close(listen_fd);
         proxy->client_fd = fd;
-	res = proxy_main(proxy);
+		setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&time, sizeof (struct timeval));
+	}
+		res = proxy_main(proxy);
         exit(res);
     default:
         close(fd);
         return SUCCESS;
     }
-//    setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&time, sizeof (struct timeval));
-        
 }
 
 /*
