@@ -38,7 +38,8 @@ validation2_head() {
     base_head "Support of command line arguments --help and -h"
 }
 validation2_body() {
-	printf > test.ok "usage: proxy [OPTIONS] PORT, where
+    printf > test.ok "\
+usage: proxy [OPTIONS] PORT, where
   OPTIONS:\n\t-h, --help, to display this usage message\n\t-v, --verbose, for verbose output
 "
     echo "Testing --help"
@@ -57,7 +58,8 @@ validation3_head() {
     base_head "Support of command line arguments --verbose and -v"
 }
 validation3_body() {
-    printf > test.ok "listening on port ${PROXY_PORT}
+    printf > test.ok "\
+listening on port ${PROXY_PORT}
 "
     echo "Testing --verbose"
     proxy --verbose ${PROXY_PORT} 2> test.out &
@@ -164,10 +166,26 @@ validation9_body() {
 # Testing via Valgrind - Not sure if this test works?
 atf_test_case validation_10
 validation_10_head() {
-    base_head "Test for memory leaks using Valgrind"
+    atf_set "require.progs" "grep nc pkill printf proxy valgrind"
+    atf_set "descr" "Test for memory leaks using Valgrind (see verbose output)"
+    atf_set "timeout" 5
 }
 validation_10_body() {
-    valgrind --tool=memcheck --leak-check=yes ./proxy -v ${PROXY_PORT}
+    printf > test.in "\
+GET http://blue.cs.sonoma.edu/ HTTP/1.1\r
+Host: blue.cs.sonoma.edu\r
+User-Agent: curl/7.54.0\r
+Accept: */*\r
+Proxy-Connection: Keep-Alive\r
+\r
+"
+    valgrind --tool=memcheck --leak-check=yes proxy -v ${PROXY_PORT} 2> test.out &
+    sleep 1 # Give the proxy time to start
+    nc ${PROXY_HOST} ${PROXY_PORT} < test.in
+    sleep 1 # Give valgrind time to print results
+    kill %1 && wait %1
+    grep -q "no leaks are possible" test.out \
+        || atf_fail "Possible leak detected, view verbose output for details"
 }
 
 atf_init_test_cases() {
