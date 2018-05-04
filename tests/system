@@ -37,12 +37,21 @@ system1_body() {
 atf_test_case system2
 system2_head() {
     atf_set "descr" "Connection times out if no request is sent"
-    atf_set "require.progs" "nc proxy"
+    atf_set "require.progs" "grep nc proxy"
     atf_set "timeout" 6
 }
 system2_body() {
+    local flag
+    if grep -q ncat $(which nc)
+    then
+        flag="--recv-only"
+    else
+        flag=""
+    fi
+
     proxy -v ${PROXY_PORT} &
-    nc ${PROXY_HOST} ${PROXY_PORT}
+    nc ${PROXY_HOST} ${PROXY_PORT} ${flag} > /dev/null
+
     # If the proxy times out the connection before the test times out, we pass.
     atf_pass
 }
