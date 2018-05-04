@@ -23,15 +23,18 @@ system1_head() {
 system1_body() {
     nc -l ${SERVER_PORT} &
 
-    proxy -v ${PROXY_PORT} > test.out &
+    proxy -v ${PROXY_PORT} 2> test.out1 &
     dummy_request | nc ${PROXY_HOST} ${PROXY_PORT}
 
     kill %2 && wait %2
 
-    proxy -v ${PROXY_PORT} >> test.out &
+    proxy -v ${PROXY_PORT} 2> test.out2 &
     dummy_request | nc ${PROXY_HOST} ${PROXY_PORT}
 
-    atf_check_equal 2 $(grep ${PROXY_PORT} test.out | wc -l)
+    grep -q ${PROXY_PORT} test.out1 \
+        || atf_fail "Not listening on requested port in first run"
+    grep -q ${PROXY_PORT} test.out2 \
+        || atf_fail "Not listening on requested port in second run"
 }
 
 atf_test_case system2
