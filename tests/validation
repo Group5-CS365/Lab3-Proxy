@@ -152,7 +152,7 @@ validation8_body() {
 }
 
 # Error Checking - Not sure how to test this (at minimum all syscalls need
-#                  error checking)
+#                  error checking) possibly redundant
 atf_test_case validation9
 validation9_head() {
     base_head "Test error checking"
