@@ -19,7 +19,7 @@ Proxy-Connection: Keep-Alive\r
 "
 
 printf > test.ok "\
-GET / HTTP/1.1\r
+GET / HTTP/1.0\r
 Host: localhost:${SERVER_PORT}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
