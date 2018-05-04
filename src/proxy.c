@@ -132,16 +132,8 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
 static void
 proxy_cleanup(struct proxy *proxy)
 {
-    bool const verbose = proxy->verbose;
-
-    if (verbose)
-        puts("waiting for children");
-
-    while (wait(NULL) != FAILURE)
-        ;
-
-    if (verbose)
-        puts("closing socket fds");
+    if (proxy->verbose)
+        fputs("closing socket fds\n", stderr);
 
     close(proxy->listen_fd);
     close(proxy->client_fd);
@@ -667,11 +659,11 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         send_error(client_fd, INTERNAL_ERROR);
         return FAILURE;
     }
-	struct timeval timeout = {5, 0};
-    
+    struct timeval timeout = { 5, 0 };
+
     proxy->server_fd = fd;
 
-    setsockopt(proxy->server_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&timeout, sizeof (struct timeval));
+    setsockopt(proxy->server_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof (struct timeval));
 
     // Restore original values.
     host.p[host.len] = htmp;
@@ -783,8 +775,9 @@ proxy_main(struct proxy *proxy)
 static int
 proxy_accept(struct proxy *proxy)
 {
+    bool const verbose = proxy->verbose;
     int const listen_fd = proxy->listen_fd;
-    struct timeval time = {5, 0};
+    struct timeval time = { 5, 0 };
 
     int fd, res;
     socklen_t socklen = sizeof (struct sockaddr_in);
@@ -798,9 +791,9 @@ proxy_accept(struct proxy *proxy)
         return FAILURE;
     }
 
-    if (proxy->verbose) {
-        puts("accepted a connection");
-	
+    if (verbose)
+        fputs("accepted a connection\n", stderr);
+
     switch (fork()) {
     case -1:
         perror("proxy_accept(): failed to fork a child process");
@@ -809,9 +802,10 @@ proxy_accept(struct proxy *proxy)
     case 0:
         close(listen_fd);
         proxy->client_fd = fd;
-		setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, (struct timeval *)&time, sizeof (struct timeval));
-	}
-		res = proxy_main(proxy);
+        setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof (struct timeval));
+        res = proxy_main(proxy);
+        if (res == EXIT_FAILURE && verbose)
+            fputs("fail\n", stderr);
         exit(res);
     default:
         close(fd);
@@ -827,16 +821,13 @@ proxy_select(struct proxy *proxy)
 {
     int const listen_fd = proxy->listen_fd;
 
-    struct timeval tv;
+    struct timeval timeout = { 5, 0 };
     fd_set fds;
-
-    tv.tv_sec = 5;
-    tv.tv_usec = 0;
 
     FD_ZERO(&fds);
     FD_SET(listen_fd, &fds);
 
-    if (select(listen_fd+1, &fds, NULL, NULL, &tv) == FAILURE) {
+    if (select(listen_fd + 1, &fds, NULL, NULL, &timeout) == FAILURE) {
         perror("proxy_select(): select() failed");
         return FAILURE;
     }
@@ -883,6 +874,12 @@ run_proxy(uint16_t port, bool verbose)
 
     while (proxy_select(&proxy) == SUCCESS)
         ward_off_zombies();
+
+    if (verbose)
+        fputs("waiting for children\n", stderr);
+
+    while (wait(NULL) != FAILURE)
+        ;
 
     proxy_cleanup(&proxy);
 }
