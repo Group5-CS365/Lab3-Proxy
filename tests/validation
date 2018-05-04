@@ -1,11 +1,11 @@
 #! /usr/bin/env atf-sh
 
 SERVER_HOST=localhost
-SERVER_PORT=2345
+SERVER_PORT=1234
 SERVER=${SERVER_HOST}:${SERVER_PORT}
 
 PROXY_HOST=localhost
-PROXY_PORT=5432
+PROXY_PORT=4321
 PROXY=${PROXY_HOST}:${PROXY_PORT}
 
 base_head() {
@@ -13,9 +13,6 @@ base_head() {
     atf_set "descr" ${1:-"A given test produces the expected result"}
 }
 base_body() {
-    nc -l ${SERVER_PORT} > test.out &
-    proxy -v ${PROXY_PORT} &
-    nc ${PROXY_HOST} ${PROXY_PORT} < test.in
 
     echo "expected result:"
     hexdump -C test.ok
@@ -26,77 +23,151 @@ base_body() {
         || atf_fail "Actual result did not match expected"
 }
 
-# Builds - Maybe redundant because of Travis?
+# Builds - Redundant sending atf_pass
 atf_test_case validation1
 validation1_head() {
     base_head "Build test"
 }
 validation1_body() {
-    atf_fail "test not implemented"
+    atf_pass
 }
 
-# Command Line Arguments
+# Command Line Arguments --help and -h
 atf_test_case validation2
 validation2_head() {
-    base_head "Support of command line arguments --help and --verbose"
+    base_head "Support of command line arguments --help and -h"
 }
 validation2_body() {
-    atf_fail "test not implemented"
+	printf > test.ok "usage: proxy [OPTIONS] PORT, where
+  OPTIONS:\n\t-h, --help, to display this usage message\n\t-v, --verbose, for verbose output
+"
+    echo "Testing --help"
+    proxy --help ${PROXY_PORT} > test.out
+    base_body
+
+    echo ""
+    echo "Testing -h"
+    proxy -h ${PROXY_PORT} > test.out
+    base_body
+}
+
+# Command Line Arguments --verbose and -v
+atf_test_case validation3
+validation3_head() {
+    base_head "Support of command line arguments --verbose and -v"
+}
+validation3_body() {
+    printf > test.ok "listening on port ${PROXY_PORT}
+"
+    echo "Testing --verbose"
+    proxy --verbose ${PROXY_PORT} 2> test.out &
+    sleep 1
+    kill %1 && wait %1
+    base_body
+
+    echo ""
+    echo "Testing -v"
+    proxy -v ${PROXY_PORT} 2> test.out &
+    sleep 1
+    kill %1 && wait %1
+    base_body
 }
 
 # Silent
-atf_test_case validation3
-validation3_head() {
-    base_head "Proxy runs silent by default"
-}
-validation3_body() {
-    atf_fail "test not implemented"
-}
-
-# Server Architecture - Other parts of this might be handled by existing tests
 atf_test_case validation4
 validation4_head() {
-    base_head "Proxy forks on each client connection and leaves no zombies"
+    base_head "Proxy runs silent by default"
 }
 validation4_body() {
-    atf_fail "test not implemented"
+    printf > test.ok ""
+    echo "Testing silent"
+    proxy ${PROXY_PORT} 2> test.out &
+    sleep 1
+    kill %1 && wait %1
+    base_body
 }
 
-# Client Support
+# Server Architecture - Redundant sending atf_pass
 atf_test_case validation5
 validation5_head() {
-    base_head "Proxy supports at least wget and lynx"
+    base_head "Proxy forks on each client connection and leaves no zombies"
 }
 validation5_body() {
-    atf_fail "test not implemented"
+    atf_pass
 }
 
-# Basic Functionality -  Not sure about this one?
+# Client Support - wget
 atf_test_case validation6
 validation6_head() {
-    base_head "Test the functionality of the proxy using existing tests"
+    base_head "Proxy supports at least wget"
 }
 validation6_body() {
-    atf_fail "test not implemented"
+    nc -l ${SERVER_PORT} > test.out &
+    proxy -v ${PROXY_PORT} &
+    env http_proxy=http://blue.cs.sonoma.edu:${PROXY_PORT}
+    wget http://${SERVER}
+
+    printf > test.ok "\
+GET / HTTP/1.1\r
+User-Agent: Wget/1.18 (linux-gnu)\r
+Accept: */*\r
+Accept-Encoding: identity\r
+Host: ${SERVER}\r
+Connection: Keep-Alive\r
+\r
+"
+    base_body
+}
+
+# Client Support - lynx
+atf_test_case validation7
+validation7_head() {
+    base_head "Proxy supports at least lynx"
+}
+validation7_body() {
+    nc -l ${SERVER_PORT} > test.out &
+    proxy -v ${PROXY_PORT} &
+    env http_proxy=http://blue.cs.sonoma.edu:${PROXY_PORT}
+    lynx http://${SERVER}
+
+    printf > test.ok "\
+GET / HTTP/1.0\r
+Host: localhost:${SERVER_PORT}\r
+Accept: text/html, text/plain, text/sgml, text/css, application/xhtml+xml, */*;q=0.01\r
+Accept-Encoding: gzip, bzip2\r
+Accept-Language: en\r
+User-Agent: Lynx/2.8.9dev.4 libwww-FM/2.14 SSL-MM/1.4.1 OpenSSL/1.0.1k-fips\r
+\r
+"
+    base_body
+}
+
+# Basic Functionality - Redundant sending atf_pass
+atf_test_case validation8
+validation8_head() {
+    base_head "Test the functionality of the proxy"
+}
+validation8_body() {
+    atf_pass
 }
 
 # Error Checking - Not sure how to test this (at minimum all syscalls need
 #                  error checking)
-atf_test_case validation7
-validation7_head() {
+atf_test_case validation9
+validation9_head() {
     base_head "Test error checking"
 }
-validation7_body() {
+validation9_body() {
     atf_fail "test not implemented"
 }
 
-# Testing via Valgrind - Not sure we need this here but it might be nice
-atf_test_case validation8
-validation8_head() {
+# Testing via Valgrind - Not sure if this test works?
+atf_test_case validation_10
+validation_10_head() {
     base_head "Test for memory leaks using Valgrind"
 }
-validation8_body() {
-    atf_fail "test not implemented"
+validation_10_body() {
+    valgrind --tool=memcheck --leak-check=yes ./proxy -v ${PROXY_PORT}
 }
 
 atf_init_test_cases() {
@@ -108,6 +179,8 @@ atf_init_test_cases() {
     atf_add_test_case validation6
     atf_add_test_case validation7
     atf_add_test_case validation8
+    atf_add_test_case validation9
+    atf_add_test_case validation_10
 }
 
 # Local Variables:

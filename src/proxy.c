@@ -121,7 +121,7 @@ proxy_start(struct proxy *proxy, uint16_t port, bool verbose)
     }
 
     if (verbose)
-        printf("listening on port %d\n", port);
+        fprintf(stderr, "listening on port %d\n", port);
 
     proxy->listen_fd = fd;
     proxy->verbose = verbose;
@@ -716,7 +716,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive request");
-            send_error(client_fd, BAD_REQUEST); // XXX: Is 400 appropriate?
+            send_error(client_fd, INTERNAL_ERROR);
             res = EXIT_FAILURE;
             break;
         }
