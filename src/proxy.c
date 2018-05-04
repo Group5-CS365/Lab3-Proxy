@@ -804,8 +804,6 @@ proxy_accept(struct proxy *proxy)
         proxy->client_fd = fd;
         setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof (struct timeval));
         res = proxy_main(proxy);
-        if (res == EXIT_FAILURE && verbose)
-            fputs("fail\n", stderr);
         exit(res);
     default:
         close(fd);
@@ -842,7 +840,7 @@ proxy_select(struct proxy *proxy)
  * Try to bury any dead children, but do not block waiting for them to die.
  */
 static void
-ward_off_zombies()
+ward_off_zombies(bool verbose)
 {
     int status = 0;
 
@@ -857,6 +855,11 @@ ward_off_zombies()
                 fputs("child terminated\n", stderr);
                 break;
             }
+        }
+        else if (WIFEXITED(status)
+                 && WEXITSTATUS(status) == EXIT_FAILURE
+                 && verbose) {
+            fputs("child exited with error\n", stderr);
         }
     }
 }
@@ -873,7 +876,7 @@ run_proxy(uint16_t port, bool verbose)
         errx(EXIT_FAILURE, "fatal error");
 
     while (proxy_select(&proxy) == SUCCESS)
-        ward_off_zombies();
+        ward_off_zombies(verbose);
 
     if (verbose)
         fputs("waiting for children\n", stderr);
