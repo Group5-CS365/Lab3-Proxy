@@ -372,7 +372,7 @@ proxy_send_request(struct proxy *proxy,
     int const client_fd = proxy->client_fd;
     int const server_fd = proxy->server_fd;
 
-    char * const version = reqln.http_version.p - 1; // -1 for SP
+    char * const version = reqln.end;
     size_t const version_offset = version - reqln.method.p;
     size_t const proxyconn_offset = proxyconn.field_name.p - version;
     size_t const proxyconn_end_offset = proxyconn.end - reqln.method.p;
@@ -385,7 +385,11 @@ proxy_send_request(struct proxy *proxy,
         },
         // Request path (minus proxy-to URI component)
         IOSTRING_TO_IOVEC(uri.path_query_fragment),
-        { // SP+Version+CRLF & Headers before Proxy-Connection OR The rest
+		{
+			.iov_base = " HTTP/1.0\r\n",
+			.iov_len = 11
+		},
+        { // Headers before Proxy-Connection OR The rest
             .iov_base = version,
             .iov_len = proxyconn.valid ? proxyconn_offset : rest_len
         },
@@ -613,7 +617,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     // Skip over CRLF.
     n -= 2;
     p += 2;
-    // TODO: Develop test to trigger this error
+
     if (p > end) {
         if (verbose)
             fputs("malformed request (too short)\n", stderr);
