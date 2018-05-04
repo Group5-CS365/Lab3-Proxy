@@ -565,7 +565,9 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     bool const verbose = proxy->verbose;
     int const client_fd = proxy->client_fd;
 
+    struct timeval const timeout = { 5, 0 };
     char const * const end = buf + len;
+
     ssize_t content_length = 0;
     struct http_request_line reqline = parse_http_request_line(buf, len);
     struct http_header_field proxyconn = { .valid = false };
@@ -659,11 +661,15 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
         send_error(client_fd, INTERNAL_ERROR);
         return FAILURE;
     }
-    struct timeval timeout = { 5, 0 };
 
     proxy->server_fd = fd;
 
-    setsockopt(proxy->server_fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof (struct timeval));
+    if (setsockopt(proxy->server_fd, SOL_SOCKET, SO_RCVTIMEO,
+                   &timeout, sizeof (struct timeval)) == FAILURE) {
+        if (verbose)
+            fputs("proxy_handle_request(): failed to set receive timeout\n",
+                  stderr);
+    }
 
     // Restore original values.
     host.p[host.len] = htmp;
@@ -710,7 +716,7 @@ proxy_main(struct proxy *proxy)
         if (len == FAILURE) {
             if (verbose)
                 perror("failed to receive request");
-            // TODO: Add 500 Internal Error
+            send_error(client_fd, BAD_REQUEST); // XXX: Is 400 appropriate?
             res = EXIT_FAILURE;
             break;
         }
@@ -777,7 +783,8 @@ proxy_accept(struct proxy *proxy)
 {
     bool const verbose = proxy->verbose;
     int const listen_fd = proxy->listen_fd;
-    struct timeval time = { 5, 0 };
+
+    struct timeval const timeout = { 5, 0 };
 
     int fd, res;
     socklen_t socklen = sizeof (struct sockaddr_in);
@@ -801,8 +808,13 @@ proxy_accept(struct proxy *proxy)
         return FAILURE;
     case 0:
         close(listen_fd);
+        if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO,
+                       &timeout, sizeof (struct timeval)) == FAILURE) {
+            if (verbose)
+                fputs("proxy_accept(): failed to set receive timeout\n",
+                      stderr);
+        }
         proxy->client_fd = fd;
-        setsockopt(proxy->client_fd, SOL_SOCKET, SO_RCVTIMEO, &time, sizeof (struct timeval));
         res = proxy_main(proxy);
         exit(res);
     default:
