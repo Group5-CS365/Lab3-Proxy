@@ -41,7 +41,7 @@ Proxy-Connection: Keep-Alive\r
 \r
 "
     printf > test.ok "\
-GET / HTTP/1.1\r
+GET / HTTP/1.0\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
@@ -68,7 +68,7 @@ Proxy-Connection: Keep-Alive\r
 \r
 "
     printf > test.ok "\
-GET ${path}${query}${fragment} HTTP/1.1\r
+GET ${path}${query}${fragment} HTTP/1.0\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
@@ -107,7 +107,7 @@ Accept: */*\r
 \r
 "
     printf > test.ok "\
-GET / HTTP/1.1\r
+GET / HTTP/1.0\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
@@ -130,7 +130,7 @@ Accept: */*\r
 \r
 "
     printf > test.ok "\
-GET / HTTP/1.1\r
+GET / HTTP/1.0\r
 Host: ${SERVER}\r
 User-Agent: curl/7.54.0\r
 Accept: */*\r
