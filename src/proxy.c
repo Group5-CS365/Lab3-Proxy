@@ -494,7 +494,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
 
     char const * const end = buf + len;
     ssize_t content_length = 0;
-    struct http_status_line statline = parse_http_status_line(buf, len);
+    struct http_status_line statline = parse_http_status_line(buf, len, verbose);
     char *p = buf;
     size_t n = len, more = 0;
 
@@ -515,7 +515,7 @@ proxy_handle_response(struct proxy *proxy, char *buf, size_t len)
          p < end && *p != '\r';
          n -= field.end - p, p = field.end) {
 
-        field = parse_http_header_field(p, n);
+        field = parse_http_header_field(p, n, verbose);
 
         if (!field.valid)
             continue;
@@ -573,7 +573,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
     char const * const end = buf + len;
 
     ssize_t content_length = 0;
-    struct http_request_line reqline = parse_http_request_line(buf, len);
+    struct http_request_line reqline = parse_http_request_line(buf, len,verbose);
     struct http_header_field proxyconn = { .valid = false };
     char htmp, ptmp, *p = buf;
     size_t n = len, more = 0;
@@ -598,7 +598,7 @@ proxy_handle_request(struct proxy *proxy, char *buf, ssize_t len, size_t buflen)
          p < end && *p != '\r';
          n -= field.end - p, p = field.end) {
 
-        field = parse_http_header_field(p, n);
+        field = parse_http_header_field(p, n, verbose);
 
         if (!field.valid)
             continue;

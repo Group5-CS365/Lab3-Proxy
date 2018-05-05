@@ -51,7 +51,7 @@ struct http_error const http_errors[STATUS_COUNT] = {
  */
 
 struct http_request_line
-parse_http_request_line(char *buf, size_t len)
+parse_http_request_line(char *buf, size_t len, bool verbose)
 {
     static char const * const crlf = "\r\n";
     static size_t const crlflen = 2;
@@ -68,8 +68,10 @@ parse_http_request_line(char *buf, size_t len)
     len -= p - buf;
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid request line (empty)\n", stderr);
-        return line;
+			}
+			return line;
     }
 
     // Method
@@ -84,8 +86,10 @@ parse_http_request_line(char *buf, size_t len)
     len -= p - line.method.p;
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid request line (after method)\n", stderr);
         fprintf(stderr, "METHOD: %.*s\n", (int)line.method.len, line.method.p);
+			}
         return line;
     }
 
@@ -101,9 +105,11 @@ parse_http_request_line(char *buf, size_t len)
     len -= p - line.request_target.p;
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid request line (after request target)\n", stderr);
         fprintf(stderr, "METHOD: %.*s\n", (int)line.method.len, line.method.p);
         fprintf(stderr, "REQUEST TARGET: %.*s\n", (int)line.request_target.len, line.request_target.p);
+			}
         return line;
     }
 
@@ -119,20 +125,25 @@ parse_http_request_line(char *buf, size_t len)
     len -= p - line.http_version.p;
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid request line (after http version)\n", stderr);
         fprintf(stderr, "METHOD: %.*s\n", (int)line.method.len, line.method.p);
         fprintf(stderr, "REQUEST TARGET: %.*s\n", (int)line.request_target.len, line.request_target.p);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
+			}
         return line;
     }
 
     // LF (already consumed CR)
     if (*p != '\n') {
+			if(verbose){
+
         fputs("warning: invalid request line (missing LF)\n", stderr);
         fprintf(stderr, "METHOD: %.*s\n", (int)line.method.len, line.method.p);
         fprintf(stderr, "REQUEST TARGET: %.*s\n", (int)line.request_target.len, line.request_target.p);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
         fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
+			}
         return line;
     }
 
@@ -162,7 +173,7 @@ debug_http_request_line(struct http_request_line reqline)
  */
 
 struct http_status_line
-parse_http_status_line(char *buf, size_t len)
+parse_http_status_line(char *buf, size_t len, bool verbose)
 {
     static char const * const crlf = "\r\n";
     static size_t const crlflen = 2;
@@ -179,8 +190,11 @@ parse_http_status_line(char *buf, size_t len)
     len -= p - buf;
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid response line (empty)\n", stderr);
+			}
         return line;
+
     }
 
     // HTTP version
@@ -195,9 +209,12 @@ parse_http_status_line(char *buf, size_t len)
     len -= p - line.http_version.p;
 
     if (p == end) {
+			if(verbose){
+
         fputs("warning: invalid status line (after http version)\n", stderr);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
-        return line;
+			}
+				return line;
     }
 
     // Status code
@@ -212,9 +229,12 @@ parse_http_status_line(char *buf, size_t len)
     len -= p - line.status_code.p;
 
     if (p == end) {
+			if(verbose){
+
         fputs("warning: invalid status line (after status code)\n", stderr);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
         fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
+			}
         return line;
     }
 
@@ -229,20 +249,24 @@ parse_http_status_line(char *buf, size_t len)
     }
 
     if (p == end || p == NULL) {
+			if(verbose){
         fputs("warning: invalid status line (after reason phrase)\n", stderr);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
         fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
         fprintf(stderr, "REASON PHRASE: %.*s\n", (int)line.reason_phrase.len, line.reason_phrase.p);
+			}
         return line;
     }
 
     // LF (already consumed CR)
     if (*p != '\n') {
+			if(verbose){
         fputs("warning: invalid response line (missing LF)\n", stderr);
         fprintf(stderr, "HTTP VERSION: %.*s\n", (int)line.http_version.len, line.http_version.p);
         fprintf(stderr, "STATUS CODE: %.*s\n", (int)line.status_code.len, line.status_code.p);
         fprintf(stderr, "REASON PHRASE: %.*s\n", (int)line.reason_phrase.len, line.reason_phrase.p);
         fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
+			}
         return line;
     }
 
@@ -272,7 +296,7 @@ debug_http_status_line(struct http_status_line statline)
  */
 
 struct http_header_field
-parse_http_header_field(char *buf, size_t len)
+parse_http_header_field(char *buf, size_t len, bool verbose)
 {
     static char const * const ws = " \t\r\v\f";
     static size_t const wslen = 5;
@@ -283,7 +307,9 @@ parse_http_header_field(char *buf, size_t len)
     struct http_header_field head = { .end = end };
 
     if (p == end) {
+			if(verbose){
         fputs("warning: invalid header field (empty)\n", stderr);
+			}
         return head;
     }
 
@@ -291,7 +317,10 @@ parse_http_header_field(char *buf, size_t len)
     head.field_name.p = p;
     p = memchr(p, ':', len);
     if (p == NULL) {
+			if(verbose){
+
         fputs("warning: invalid header field\n", stderr);
+			}
         head.valid = false;
         return head;
     }
@@ -307,8 +336,11 @@ parse_http_header_field(char *buf, size_t len)
     }
 
     if (p == end || p == NULL) {
+			if(verbose){
+
         fputs("warning: invalid header field (after field name)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
+			}
         return head;
     }
 
@@ -324,17 +356,23 @@ parse_http_header_field(char *buf, size_t len)
     len -= p - head.field_value.p;
 
     if (p == end) {
+			if(verbose){
+
         fputs("warning: invalid header field (after field value)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
+			}
         return head;
     }
 
     if (*p != '\n') {
+			if(verbose){
+
         fputs("warning: invalid header field (missing LF)\n", stderr);
         fprintf(stderr, "FIELD NAME: %.*s\n", (int)head.field_name.len, head.field_name.p);
         fprintf(stderr, "FIELD VALUE: %.*s\n", (int)head.field_value.len, head.field_value.p);
         fprintf(stderr, "got instead of LF: %.*s\n", (int)len, p);
+			}
         return head;
     }
 

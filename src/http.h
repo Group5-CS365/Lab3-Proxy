@@ -56,7 +56,7 @@ struct http_request_line {
  * the .valid member of the returned data structure will be true.
  * Otherwise, .valid will be false and the iostring fields should not be used.
  */
-struct http_request_line parse_http_request_line(char *buf, size_t len);
+struct http_request_line parse_http_request_line(char *buf, size_t len, bool verbose);
 
 /*
  * Print the contents of the given data structure to stdout.
@@ -84,7 +84,7 @@ struct http_status_line {
  * the .valid member of the returned data structure will be true.
  * Otherwise, .valid will be false and the iostring fields should not be used.
  */
-struct http_status_line parse_http_status_line(char *buf, size_t len);
+struct http_status_line parse_http_status_line(char *buf, size_t len, bool verbose);
 
 /*
  * Print the contents of the given data structure to stdout.
@@ -110,7 +110,7 @@ struct http_header_field {
  * the .valid member of the returned data structure will be true.
  * Otherwise, .valid will be false and the iostring fields should not be used.
  */
-struct http_header_field parse_http_header_field(char *buf, size_t len);
+struct http_header_field parse_http_header_field(char *buf, size_t len, bool verbose);
 
 /*
  * Print the contents of the given data structure to stdout.
@@ -127,7 +127,7 @@ enum http_status_code { BAD_REQUEST, INTERNAL_ERROR, BAD_GATEWAY,
 						TIMEOUT, STATUS_COUNT };
 
 /*
- * Error 
+ * Error
  */
 extern struct http_error {
 	struct iostring status, reason, content_length, body;
